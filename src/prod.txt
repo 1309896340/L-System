@@ -1,0 +1,8 @@
+param: 
+    degree = 60
+
+axiom:
+    F
+
+productions: 
+    F --> F+F--F+F
