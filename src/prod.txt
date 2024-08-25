@@ -1,5 +1,8 @@
-param: 
+params: 
     degree = 60
+
+variables:
+    F
 
 axiom:
     F
