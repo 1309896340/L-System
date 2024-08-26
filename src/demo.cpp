@@ -2,13 +2,14 @@
 
 using namespace std;
 
+int main(int argc, char **argv) {
 
-int main(int argc, char **argv){
+  // LSystem::test_for_using();
 
-    // LSystem::test_for_using();
+  vector<string> vars = {"F"};
+  LRule rules = {{"F", "F+F--F+F"}};
 
-    string a = "";
+  LSystem sys(vars, "F", rules);
 
-
-    return 0;
+  return 0;
 }
