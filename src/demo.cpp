@@ -13,7 +13,7 @@ int main(int argc, char** argv) {
         printf("调试字符串： %s\n", s.c_str());
         auto s_input = lexy::zstring_input(s.c_str());
         // lexy::validate<SymDefineExpr>(s_input, lexy_ext::report_error);
-        auto result = lexy::parse<SymDefineExpr>(s_input, lexy_ext::report_error);
+        auto result = lexy::parse<Sym>(s_input, lexy_ext::report_error);
 
         bool isOk = result.is_success();
         if (!isOk)
