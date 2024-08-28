@@ -4,7 +4,7 @@
 #include <vector>
 #include <unordered_set>
 #include <cstdint>
-
+#include <optional>
 
 #include "lexy/action/parse.hpp"
 #include "lexy_ext/report_error.hpp"
