@@ -9,7 +9,7 @@
 namespace {
 using namespace std;
 
-// =================================值构造========================================
+namespace config {
 struct Psym {  // 每一个带参符号，都由符号名、参数列表(参数指针，参数个数)构成
     string sym_name;
     optional<vector<string>> params;  // 形式参数的名字
@@ -36,11 +36,12 @@ struct Number {
         return res;
     }
 };
+}  // namespace config
 
 // // 函数由函数名、参数列表(实参名，所有实参的表达式) 构成
 // using Pfunc = map<string, unordered_set<string, string>>;
 
-// =================================解析规则========================================
+namespace grammar {
 namespace dsl = lexy::dsl;
 constexpr auto escaped_newline = dsl::backslash >> dsl::newline;
 struct SymName {
@@ -73,12 +74,12 @@ struct Sym {
         return sym_name + paramlist;
     }();
     // 需要将解析出来的内容，注入到Psym中去
-    static constexpr auto value = lexy::construct<Psym>;
+    static constexpr auto value = lexy::construct<config::Psym>;
 };
 
 struct NumberProduction {
     static constexpr auto rule = dsl::integer<int> + dsl::opt(dsl::lit_c<'.'> >> dsl::integer<int>);
-    static constexpr auto value = lexy::construct<Number>;
+    static constexpr auto value = lexy::construct<config::Number>;
 };
 
 // struct ParameterMappedItem {
@@ -89,21 +90,26 @@ struct NumberProduction {
 //   }();
 // };
 
-struct NestedExpression: lexy::transparent_production{
-  static constexpr auto whitespace = dsl::ascii::space | escaped_newline;
-  static constexpr auto rule = dsl::recurse<MathExpr>;
-  // static constexpr auto value = lexy::forward<>
+struct NestedExpression : lexy::transparent_production {
+    static constexpr auto whitespace = dsl::ascii::space | escaped_newline;
+    static constexpr auto rule = dsl::recurse<MathExpr>;
+    // static constexpr auto value = lexy::forward<>
 };
 
 struct MathExpr : lexy::expression_production {  // 目前这套规则没有实现带括号的表达式嵌套，但可以先尝试一下是否匹配
+
+    struct expected_operand {
+        static constexpr auto name = "expected operand";
+    };
+
     static constexpr auto whitespace = dsl::ascii::space;
-    static constexpr auto atom = []{
-      auto literal_number = dsl::p<Number>;           // 数值字面量
-      auto defined_param_name = dsl::p<ParameterItem>; // 左侧的形参名
-      auto nested_expr = dsl::parenthesized(dsl::p<NestedExpression>);    // 带括号的嵌套的表达式
-      return literal_number | defined_param_name | nested_expr | dsl::error<expected_operand>;
+    static constexpr auto atom = [] {
+        auto literal_number = dsl::p<config::Number>;                     // 数值字面量
+        auto defined_param_name = dsl::p<ParameterItem>;                  // 左侧的形参名
+        auto nested_expr = dsl::parenthesized(dsl::p<NestedExpression>);  // 带括号的嵌套的表达式
+        return literal_number | defined_param_name | nested_expr | dsl::error<expected_operand>;
     }();
-    
+
     struct ExprItem : dsl::infix_op_left {
         // 乘除相比加减有更高的优先级，将其整体称作 Item
         static constexpr auto op = dsl::op(dsl::lit_c<'*'>) / dsl::op(dsl::lit_c<'/'>);
@@ -115,7 +121,6 @@ struct MathExpr : lexy::expression_production {  // 目前这套规则没有实�
         using operand = ExprItem;
     };
 };
-
 
 struct ParameterMappedList {
     static constexpr auto rule = dsl::parenthesized.list(dsl::p<MathExpr>, dsl::sep(dsl::comma));
@@ -138,6 +143,7 @@ struct SymMap {
     // 这些都是好解决的，问题在于解析出的这些数据应该如何描述？
     // 再SymDefineExpr中主要描述了映射的签名部分，这里需要描述映射的主体
 };
+}  // namespace grammar
 }  // namespace
 
 #endif
