@@ -9,8 +9,9 @@
 #include <utility>
 #include <vector>
 
-#include <lexy/callback.hpp>
-#include <lexy/dsl.hpp>
+#include "lexy/callback.hpp"
+#include "lexy/dsl.hpp"
+// #include "lexy/dsl/unicode.hpp"
 
 namespace
 {
@@ -261,8 +262,8 @@ namespace grammar
     // A Unicode-aware identifier.
     struct name
     {
-        static constexpr auto rule
-            = dsl::identifier(dsl::unicode::xid_start_underscore, dsl::unicode::xid_continue);
+        // static constexpr auto rule = dsl::identifier(dsl::unicode::xid_start_underscore, dsl::unicode::xid_continue);
+        static constexpr auto rule = dsl::identifier(dsl::ascii::alpha / dsl::lit_c<'_'>, dsl::ascii::alnum / dsl::lit_c<'_'>);
 
         static constexpr auto value = lexy::as_string<std::string>;
     };
@@ -442,9 +443,9 @@ namespace grammar
 } // namespace
 
 #ifndef LEXY_TEST
-#    include <lexy/action/parse.hpp>
-#    include <lexy_ext/report_error.hpp>
-#    include <lexy_ext/shell.hpp>
+#    include "lexy/action/parse.hpp"
+#    include "lexy_ext/report_error.hpp"
+#    include "lexy_ext/shell.hpp"
 
 int main()
 {

@@ -98,3 +98,11 @@ D0LSystem的 `iterate()` 实现
 
 表达式中对L-System产生式的描述方法：将其表示为长度n的语法树数组，即 `vector<expr>` ，n为形参数量。
 
+
+
+## lexy分支解析
+
+`dsl::if_` `dsl::else_`  `dsl::try_`  `dsl::opt`
+`dsl::peek`  `operator|` `operator>>`
+
+`branch-rule >> branch`
