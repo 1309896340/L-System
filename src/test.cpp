@@ -54,10 +54,24 @@ void test_for_value() {
     lexy::visualize(stdout, tree, {lexy::visualize_fancy});
 }
 
+void test_for_LProduction(){
+    auto sinput = lexy::zstring_input("F(x,y,z) -> A(x+1,-y*0.3,(x+y)/2-z)F(0.8*x,0.6*y,0.9*z)C((x+y+z)/2)");
+
+    lexy::parse_tree_for<decltype(sinput)> tree;
+    auto res = lexy::parse_as_tree<grammar::LProduction>(tree, sinput, lexy_ext::report_error);
+    bool success = res.is_success();
+    if(!success){
+        printf("匹配失败\n");
+        return;
+    }
+    lexy::visualize(stdout, tree,{lexy::visualize_fancy});
+}
+
 int main(void) {
     // test_for_key();
     // test_for_Number();
-    test_for_value();
+    // test_for_value();
+    test_for_LProduction();
 
     return 0;
 }

@@ -138,6 +138,15 @@ struct SymMapList {
     }();
 };
 
+struct LProduction{
+    static constexpr auto whitespace = dsl::ascii::space;
+    static constexpr auto rule = []{
+        auto lhs = dsl::p<Sym>;
+        auto rhs = dsl::p<SymMapList>;
+        return lhs + LEXY_LIT("->") + rhs;
+    }();
+};
+
 }  // namespace grammar
 }  // namespace
 
