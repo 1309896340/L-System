@@ -48,7 +48,7 @@ struct SymName {
     static constexpr auto value = lexy::as_string<string>;
 };
 
-struct ParameterItem {
+struct ParamItem {
     // static constexpr auto whitespace = dsl::ascii::space;  // 设置自动跳空格
     static constexpr auto rule = dsl::identifier(
         dsl::ascii::alpha / dsl::lit_c<'_'>,
@@ -56,9 +56,9 @@ struct ParameterItem {
     static constexpr auto value = lexy::as_string<string>;
 };
 
-struct ParameterList {
+struct ParamList {
     static constexpr auto rule =
-        dsl::parenthesized.list(dsl::p<ParameterItem>, dsl::sep(dsl::comma));
+        dsl::parenthesized.list(dsl::p<ParamItem>, dsl::sep(dsl::comma));
     static constexpr auto value = lexy::as_list<vector<string>>;
 };
 
@@ -67,7 +67,7 @@ struct Sym {
         auto sym_name =
             dsl::p<SymName>;  // 匹配带括号的形式参数列表，例如 "(abc,aaa,bcd,aab)"
         auto paramlist = dsl::opt(
-            dsl::p<ParameterList>);  // 如果不带参数，则会产生一个 dsl::nullopt
+            dsl::p<ParamList>);  // 如果不带参数，则会产生一个 dsl::nullopt
         return sym_name + paramlist;
     }();
     static constexpr auto value = lexy::construct<config::Psym>;
@@ -94,7 +94,7 @@ struct MathExpr : lexy::expression_production {
         auto number_prefix = dsl::peek(dsl::ascii::digit);
 
         auto literal_number = number_prefix >> dsl::p<grammar::Number>;
-        auto defined_param_name = param_name_prefix >> dsl::p<ParameterItem>;
+        auto defined_param_name = param_name_prefix >> dsl::p<ParamItem>;
 
         auto paren_expr = dsl::parenthesized(dsl::p<NestedExpr>);
         return paren_expr | literal_number | defined_param_name | dsl::error<expected_operand>;
@@ -119,14 +119,14 @@ struct MathExpr : lexy::expression_production {
     using operation = Expr;
 };
 
-struct ParameterMappedList {
+struct ParamMappedList {
     static constexpr auto rule = dsl::parenthesized.list(dsl::p<MathExpr>, dsl::sep(dsl::comma));
 };
 
 struct SymMap {
     static constexpr auto rule = [] {
         auto sym_name = dsl::p<SymName>;
-        auto param_list = dsl::opt(dsl::p<ParameterMappedList>);
+        auto param_list = dsl::opt(dsl::p<ParamMappedList>);
         return sym_name + param_list;
     }();
 };

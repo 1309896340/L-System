@@ -4,21 +4,7 @@ D0L-System : 确定性、上下文无关
 
 <br/>
 
-
-
-# 实现一个简单的D0L-System
-
-示例：雪花分形
-
-`Varname: F`
-
-`Axiom: F`
-
-`Production: F -> F+F--F+F`
-
-需要用lexy解析这个表达式
-
-## 类设计
+## 前期类设计
 
 首先，对LSystem的初始化，需要注册所有会用到的变量名，例如这里的 `F` 就是变量名
 
@@ -28,7 +14,7 @@ D0L-System : 确定性、上下文无关
 
 但是这么做，显得 `iterate()` 太过独立，但它要做的事相当明确，就是由一个输入串，根据LRule进行替换，生成新串。将 `iterate()` 独立出来的好处，是可以通过将其指定为虚函数，以派生不同规则的LSystem子类
 
-## 初步构思实现
+## 前期头脑风暴
 
 D0LSystem的 `iterate()` 实现
 
@@ -55,24 +41,30 @@ D0LSystem的 `iterate()` 实现
 
 ## 语法规则整理
 
-### 解析L-System产生式的定义
+### 解析L-System产生式的语法设计和命名
 
-`Sym` : 产生式的左半部分
+参考例子： `F(x,y) -> A(0.1*x,0.2*y,x-y)F(x-y,x+y)B((x+y)/2)`
+
+`Sym` : 产生式的左半部分，以 `SymName` 开头并紧跟一个可为空的 `(` `ParamList` `)`
 
 `SymName` : `Sym` 的名称部分，以字母、下划线开头，后续字母、数字、下划线的组合
 
-`ParameterList` : 由圆括号包裹任意数量个 `ParamItem` 构成
+`ParamList` : 由圆括号包裹任意数量个 `ParamItem` 构成
 
 `ParamItem` : 符号的参数项，指定 `Sym` 的形式参数名，以字母、下划线开头，后续字母、数字、下划线的组合
 
+`SymMap` : 产生式的右半部分，同样以 `SymName` 开头但紧跟一个可为空的 `(` `ParamMappedList` `)`
 
-<br/>
+`ParamMappedList` : 左侧形式参数映射到的右侧的参数列表，以 `,` 为分隔符，每项为 `MathExpr`
 
-`SymMap` : 产生式的右半部分，同样以 `SymName` 开头并紧跟一个可选择的 `ParameterMappedList`，但是其item定义有所区别，映射到的目标是原 `ParamItem` 构成的表达式
+`MathExpr` : 数学表达式，其最小构成单元为 `ParamItem`、`Number`、 带括号的嵌套 `MathExpr` 
 
-`ParameterMappedList` : 左侧形式参数映射到的右侧的参数列表，其中的每一项为 `MathExpr`
+`SymMapList` : 多个 `SymMap` 的无分隔符拼接
 
-`MathExpr` : 数学表达式，由 `ParamItem`、`Number`、 递归的 `MathExpr` 构成
+`LProduction` : 完整的L-System产生式，由 `->` 左侧的 `Sym` 和右侧的 `SymMapList` 构成
+
+### Cpp-Lexy的实现思路
+
 
 
 
@@ -82,8 +74,8 @@ D0LSystem的 `iterate()` 实现
 表达式的作用域
 ```cpp
     struct environment{
-        // 解析出来的L-System 生成式
-
+        // 一个LProduction中，每个Sym的每个ParamItem都对应一个SymMap
+        // 待构建 LProduction 对应的执行类
     };
 ```
 
@@ -96,13 +88,4 @@ D0LSystem的 `iterate()` 实现
     };
 ```
 
-表达式中对L-System产生式的描述方法：将其表示为长度n的语法树数组，即 `vector<expr>` ，n为形参数量。
 
-
-
-## lexy分支解析
-
-`dsl::if_` `dsl::else_`  `dsl::try_`  `dsl::opt`
-`dsl::peek`  `operator|` `operator>>`
-
-`branch-rule >> branch`
