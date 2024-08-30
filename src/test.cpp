@@ -19,7 +19,7 @@ void test_for_key() {
         if (!isOk)
             break;
 
-        config::Psym p = result.value();
+        config::Sym p = result.value();
         bool hasParam = p.params.has_value();
 
         printf("符号名：%s\n", p.sym_name.c_str());
@@ -35,7 +35,7 @@ void test_for_key() {
 
 void test_for_Number() {
     auto sinput = lexy::zstring_input("12");
-    auto res = lexy::parse<grammar::Number>(sinput, lexy_ext::report_error);
+    auto res = lexy::parse<grammar::NumberD>(sinput, lexy_ext::report_error);
     printf("是否成功：%d\n", res.is_success());
     config::Number val = res.value();
     printf("解析结果为  %.6f\n", val.value());
@@ -67,11 +67,35 @@ void test_for_LProduction(){
     lexy::visualize(stdout, tree,{lexy::visualize_fancy});
 }
 
+void test_for_expr(){
+    
+    auto sinput = lexy::zstring_input("(x+y)/2-z+3*x*y");
+
+    // lexy::parse_tree_for<decltype(sinput)> tree;
+    // auto res = lexy::parse_as_tree<grammar::LProduction>(tree, sinput, lexy_ext::report_error);
+    // bool success = res.is_success();
+    // if(!success){
+    //     printf("匹配失败\n");
+    //     return;
+    // }
+    // lexy::visualize(stdout, tree,{lexy::visualize_fancy});
+    
+    auto res = lexy::parse<grammar::MathExpr>(sinput, lexy_ext::report_error);
+
+    auto val = res.value();
+    ast::Environment env;
+    
+    printf("res = %.4f\n",val->evaluate(env));
+}
+
 int main(void) {
     // test_for_key();
     // test_for_Number();
     // test_for_value();
-    test_for_LProduction();
+
+    test_for_expr();
+
+    // test_for_LProduction();
 
     return 0;
 }
