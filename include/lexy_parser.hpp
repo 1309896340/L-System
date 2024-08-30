@@ -21,6 +21,10 @@ struct Sym {  // 每一个带参符号，都由符号名、参数列表(参数�
 };
 
 struct SymMap {
+  string name;                              // 右侧符号组的其中一个符号的名
+  optional<vector<ast::expr_ptr>> mappers;  // 一个符号包含若干个映射，vector长度为对应符号的参数数量
+  SymMap(string &name, optional<vector<ast::expr_ptr>> &mappers):name(name),mappers(mappers){}
+  // 构建出该结构体，其实已经可以调用其各个ast的计算方法，但需要在传入Environment变量之前设置好相应的自变量的值，否则会因找不到变量而出错
 };
 
 struct LProduction {
@@ -246,14 +250,14 @@ struct MathExpr : lexy::expression_production {
         lexy::forward<ast::expr_ptr>,
         lexy::new_<ast::Expr_unary, ast::expr_ptr>,
         lexy::new_<ast::Expr_binary, ast::expr_ptr>,
-        lexy::new_<ast::Expr_literal, ast::expr_ptr>,  // 字面量
+        lexy::new_<ast::Expr_literal, ast::expr_ptr>,
         lexy::new_<ast::Expr_var, ast::expr_ptr>
     );
 };
 
 struct ParamMappedList {
     static constexpr auto rule = dsl::parenthesized.list(dsl::p<MathExpr>, dsl::sep(dsl::comma));
-    static constexpr auto value = lexy::as_list<vector<ast::Expr>>;
+    static constexpr auto value = lexy::as_list<vector<ast::expr_ptr>>;
 };
 
 struct SymMap {
@@ -262,6 +266,7 @@ struct SymMap {
         auto param_list = dsl::opt(dsl::p<ParamMappedList>);
         return sym_name + param_list;
     }();
+    static constexpr auto value = lexy::construct<config::SymMap>;
 };
 
 struct SymMapList {
