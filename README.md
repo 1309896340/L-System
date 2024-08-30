@@ -1,8 +1,22 @@
-# L-System
+# L-System简介
 
-D0L-System : 确定性、上下文无关
+Lindenmayer系统，简称L-System，是一种字符串并行重写系统，由匈牙利植物学家Aristid Lindenmayer在其1968研究关于生长发育过程中细胞交互作用的数学模型[[1]](#参考链接)中使用的形式文法。后与其继任者Przemyslaw Prusinkiewicz著有 _The Algorithm Beauty of Plants_ [[2]](#参考链接)一书。
+
+本项目基于C++17标准的lexy库[[3]](#参考链接)，实现带参数、确定性、上下文无关L-System解析生成器。
+
+![LSystemExample](/assets/images/LSystemExample.png)
 
 <br/>
+
+### 参考链接
+[1]. [Mathematical models for cellular interactions in development I. Filaments with one-sided inputs](https://doi.org/10.1016/0022-5193(68)90079-9)
+[2]. [The Algorithm Beauty of Plants](http://algorithmicbotany.org/papers/abop/abop.pdf)
+[3]. [lexy: C++ parsing DSL](https://lexy.foonathan.net/)
+
+
+<br/>
+
+# 日志
 
 ## 前期类设计
 
