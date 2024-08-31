@@ -181,12 +181,12 @@ namespace config{
 这个包装类需不需要继承 `ast::expr_ptr` 接口？
 思考：继承它意味着这个类可以成为表达式的一部分，但是原本的 `evaluate()` 方法返回值是 `float` ，而不是这里应该返回的调用结果 `SymResult` ，从这个角度判断，它不应该继承 `ast::expr_ptr`，它不是表达式，而应该是放在 `Environment` 中，和 `calculator.cpp` 的 `funciton` 类似的存在
 
-但它需要执行一个动作，就是根据输入的 `name` 调用对应的L系统产生式，计算每个 `params` 的值，然后返回一段新的字符串，考虑将这个动作设计为一个方法，对 `SymCall` 定义进行补充
+但它需要执行一个动作，就是根据输入的 `name` 调用对应的L系统产生式，计算每个 `params` 的值，然后返回一段新的字符串，考虑将这个动作设计为一个方法，对 `LSymCall` 定义进行补充
 
 
 ```c++
 namespace config{
-    struct SymCall{
+    struct LSysCall{
         string name;
         vector<ast::expr_ptr> params;
         SymCall(string name, vector<ast::expr_ptr> params):name(LEXY_MOV(name)),params(LEXY_MOV(params)){}

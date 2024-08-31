@@ -22,7 +22,7 @@ void test_for_key() {
         config::Sym p = result.value();
         bool hasParam = p.params.has_value();
 
-        printf("符号名：%s\n", p.sym_name.c_str());
+        printf("符号名：%s\n", p.name.c_str());
         printf("参数列表：%s\n", hasParam ? "" : "空");
         if (hasParam) {
             for (string& pv : p.params.value())
@@ -80,7 +80,7 @@ void test_for_LProduction() {
     config::LSystem lsys = res.value();
 
     for(auto &prod:lsys.prods){
-        printf("name : %s\n", prod.name.c_str());
+        printf("name : %s\n", prod.sym.name.c_str());
     }
 
     printf("\n");
@@ -107,12 +107,31 @@ void test_for_expr(){
 }
 
 
+void test_for_LSysCall(){
+    // auto sinput = lexy::zstring_input("F(0.1,2.3,1.6)A(1,3)C(5)");
+    auto s_input = lexy::zstring_input("F(0.5, 2.5, -5.0)");
+    auto s_prod = lexy::zstring_input("F(x, y, z) -> A((x+y)*z, (x-z)/2, (x+z)/(x-y))F(x,y,z)B((x+y+z)/3)Hello(x*y-z)");
+
+    auto res = lexy::parse<grammar::LSystem>(s_prod, lexy_ext::report_error);
+    assert(res.is_success());
+    config::LSystem lsys = res.value();
+
+    auto rr = lexy::parse<grammar::LSysCall>(s_input, lexy_ext::report_error);
+    assert(rr.is_success());
+    config::LSysCall lsysc = rr.value();
+
+    string output = lsysc.apply(lsys);
+    printf("生成新字符串为: %s\n", output.c_str());
+}
+
 int main(void) {
     // test_for_key();
     // test_for_Number();
     // test_for_value();
     // test_for_expr();
-    test_for_LProduction();
+    // test_for_LProduction();
+
+    test_for_LSysCall();
 
     return 0;
 }

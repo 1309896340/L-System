@@ -13,7 +13,8 @@ namespace ast {
 using expr_ptr = shared_ptr<struct Expr>;
 
 struct Environment {
-  map<string, float> vars{{"x", 1.0}, {"y", 2.0}, {"z", 3.0}};
+  // map<string, float> vars{{"x", 1.0}, {"y", 2.0}, {"z", 3.0}};
+  map<string, float> vars;
 };
 
 struct Expr {
@@ -106,12 +107,12 @@ struct Number {
   float value() const { return static_cast<float>(int_part) + fraction_part; }
 };
 struct Sym { // 每一个带参符号，都由符号名、参数列表(参数指针，参数个数)构成
-  string sym_name;
+  string name;
   optional<vector<string>> params; // 形式参数的名字
 
-  Sym() : sym_name(""), params({}) {}
+  Sym() : name(""), params({}) {}
   Sym(string name, const optional<vector<string>> params)
-      : sym_name(LEXY_MOV(name)), params(LEXY_MOV(params)) {
+      : name(LEXY_MOV(name)), params(LEXY_MOV(params)) {
     // printf("在config::Sym中解析出 sym_name 为 %s\n", sym_name.c_str());
   }
 };
@@ -126,24 +127,81 @@ struct SymMap {
 };
 
 struct LProduction {
-  string name;
   Sym sym;
   vector<SymMap> smaps;
   LProduction(Sym sym, vector<SymMap> smaps)
-      : sym(LEXY_MOV(sym)), smaps(LEXY_MOV(smaps)) {
-    this->name = this->sym.sym_name;
-  }
+      : sym(LEXY_MOV(sym)), smaps(LEXY_MOV(smaps)) {}
 };
 
 struct LSystem {
   vector<config::LProduction> prods;
+  map<string, int> prod_table;
 
-  LSystem(vector<config::LProduction> prods) : prods(LEXY_MOV(prods)) {}
+  LSystem(vector<config::LProduction> prods) : prods(LEXY_MOV(prods)) {
+    // 为了方便匹配产生式，维护一个map<string, int>表
+    int id = 0;
+    for(const config::LProduction &pd : this->prods){
+      prod_table[pd.sym.name] = id;
+      // printf("加入一个新元素 %s  编号为 %d\n",pd.sym.name.c_str(), id);
+      id++;
+    }
+  }
   LSystem(vector<string> &prods) {
     // 分别进行解析，转换为LProduction然后构造prods
     throw "对字符串的解析还没有实现";
   }
 };
+
+struct LSysCall {
+  string name;
+  optional<vector<ast::expr_ptr>> params;
+  LSysCall(string name, optional<vector<ast::expr_ptr>> params)
+      : name(LEXY_MOV(name)), params(LEXY_MOV(params)) {}
+
+  string apply(const config::LSystem &lsys) const {
+    // 先从lsys中遍历其prods数组，每个元素是LProduction实例，该实例的sym成员的name
+    auto iter = lsys.prod_table.find(name);
+    if(iter==lsys.prod_table.end()){
+      printf("LSystem的产生式中找不到匹配\"%s\"的规则\n", name.c_str());
+      throw "Unknown L-System Production.";
+    }
+    const config::LProduction & lp = lsys.prods[iter->second];
+    map<string, float> argument_binding;
+    ast::Environment tmp_env;
+    if(lp.sym.params.has_value()){
+      const vector<string> &pnames = lp.sym.params.value();
+      const vector<ast::expr_ptr> & args = this->params.value();
+      int idx = 0;
+      for(const string &pname : pnames){
+        argument_binding[pname] = args[idx++]->evaluate(tmp_env);
+      }
+    }
+    // 把解析到的lp.sym的所有参数名作为key，且把this->params中所有表达式计算出来作为value，初始化这个env的map
+    ast::Environment env{argument_binding};
+    // 遍历lsys.smaps的每个SymMap并遍历其中每个参数表达式，拼接生成新字符串
+
+    // printf("调试输出当前env的值\n");
+    // for(auto &elem: env.vars){
+    //   printf("变量名：%s  值：%f\n", elem.first.c_str(), elem.second);
+    // }
+    string output;
+    for(const config::SymMap &sm : lp.smaps){
+      output.append(sm.name);
+      if(!sm.mappers.has_value())
+        continue;
+      output.push_back('(');
+      for(const ast::expr_ptr &expr : sm.mappers.value()){
+        output.append(to_string(expr->evaluate(env)));
+        output.push_back(',');
+      }
+      output.pop_back();  // 去掉最末尾的逗号
+      output.push_back(')');
+    }
+    
+    return output;
+  }
+};
+
 } // namespace config
 
 namespace grammar {
@@ -302,6 +360,17 @@ struct LProductionList {
 struct LSystem {
   static constexpr auto rule = dsl::p<grammar::LProductionList>;
   static constexpr auto value = lexy::construct<config::LSystem>;
+};
+
+struct LSysCall {
+  // 解析输入的符号串，构造config::LSysCall
+  static constexpr auto rule = [] {
+    auto name = dsl::p<SymName>;
+    auto param_list = dsl::p<ParamMappedList>;
+    auto opt_param_list = dsl::opt(param_list);
+    return name + opt_param_list;
+  }();
+  static constexpr auto value = lexy::construct<config::LSysCall>;
 };
 
 } // namespace grammar
