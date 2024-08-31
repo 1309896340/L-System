@@ -229,23 +229,29 @@ struct MathExpr : lexy::expression_production {
         return paren_expr | literal_number | defined_param_name | dsl::error<expected_operand>;
     }();
 
-    struct Item : dsl::infix_op_left {  // 乘除运算
+    struct ExprItem : dsl::infix_op_left {  // 乘除运算
         static constexpr auto op = dsl::op<ast::Expr_binary::multiply>(dsl::lit_c<'*'>) / dsl::op<ast::Expr_binary::divide>(dsl::lit_c<'/'>);
         using operand = dsl::atom;
     };
 
-    struct Neg : dsl::prefix_op {  // 单目运算取相反数
+    struct ExprNeg : dsl::prefix_op {  // 单目运算取相反数
         // 对ExprItem可能的取反
         static constexpr auto op = dsl::op<ast::Expr_unary::negate>(dsl::lit_c<'-'>);
-        using operand = Item;
+        using operand = ExprItem;
     };
 
-    struct Expr : dsl::infix_op_left {  // 加减运算
+    struct ExprRow : dsl::infix_op_left {  // 加减运算
         static constexpr auto op = dsl::op<ast::Expr_binary::plus>(dsl::lit_c<'+'>) / dsl::op<ast::Expr_binary::minus>(dsl::lit_c<'-'>);
-        using operand = Neg;
+        using operand = ExprNeg;
     };
 
-    using operation = Expr;
+    struct ExprAssign : dsl::infix_op_single{
+        // 实现对LProduction的定义，将其合并入ast
+        static constexpr auto op = dsl::op<void>(LEXY_LIT("->"));
+        using operand = ExprRow;
+    };
+
+    using operation = ExprRow;
 
     static constexpr auto value = lexy::callback<ast::expr_ptr>(
         lexy::forward<ast::expr_ptr>,
