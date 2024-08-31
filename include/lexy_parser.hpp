@@ -10,37 +10,6 @@ namespace {
 using namespace std;
 
 namespace config {
-struct Sym {  // 每一个带参符号，都由符号名、参数列表(参数指针，参数个数)构成
-    string sym_name;
-    optional<vector<string>> params;  // 形式参数的名字
-
-    Sym()
-        : sym_name(""), params({}) {}
-    Sym(const string& name, const optional<vector<string>>& params)
-        : sym_name(name), params(params) {}
-};
-
-struct SymMap {
-  string name;                              // 右侧符号组的其中一个符号的名
-  optional<vector<ast::expr_ptr>> mappers;  // 一个符号包含若干个映射，vector长度为对应符号的参数数量
-  SymMap(string &name, optional<vector<ast::expr_ptr>> &mappers):name(name),mappers(mappers){}
-  // 构建出该结构体，其实已经可以调用其各个ast的计算方法，但需要在传入Environment变量之前设置好相应的自变量的值，否则会因找不到变量而出错
-};
-
-struct LProduction {
-    // 以 F(x,y) -> A(x+y,x-y,x*y)F(y,x)B((x+y)/2) 为例
-    // 一个L产生式由若干的SymMap来描述，SymMap的数量等于rhs中符号的数量，例如 "A" "F" "B"
-    // 每个SymMap又由多个Expr组成，Expr描述了如何将lhs中的参数映射到对应SymMap中的每一项，Expr需要实现：
-    // 1. 单目运算取负操作
-    // 2. 带括号的加减乘除四则运算
-    // 3. 其他可能的初等函数调用，例如sin() exp() pow(,) log()
-    string name;  // 例如上述的"F"
-    Sym sym;
-    SymMap smap;
-    LProduction(string &name, Sym &sym, SymMap &smap):name(name),sym(sym),smap(smap){}
-    
-};
-
 struct Number {
     int int_part;
     float fraction_part;
@@ -56,8 +25,7 @@ struct Number {
         return static_cast<float>(int_part) + fraction_part;
     }
 };
-
-}  // namespace config
+};  // namespace config
 
 namespace ast {
 using expr_ptr = shared_ptr<struct Expr>;
@@ -87,6 +55,29 @@ struct Expr_literal : Expr {
     }
 };
 
+// struct Expr_sym : Expr {
+//     config::Sym sym;
+//     Expr_sym(config::Sym sym)
+//         : sym(LEXY_MOV(sym)) {}
+
+//     virtual float evaluate(Environment& env) const {
+//         return 0;  // 定义L系统生成式没有返回值
+//     };
+// };
+
+// struct Expr_define: Expr{
+//     // 未完成的逻辑
+
+//     Expr_define(expr_ptr lhs, expr_ptr rhs){
+//         // lhs必须是Sym可以解析的对象，rhs必须是SymMap可以解析的对象
+
+//     }
+
+//     virtual float evaluate(Environment &env)const{
+
+//     }
+// };
+
 struct Expr_var : Expr {
     string varname;
     Expr_var(string varname)
@@ -107,8 +98,8 @@ struct Expr_unary : Expr {  // 单目运算
     } op;
     expr_ptr rhs;
 
-    explicit Expr_unary(op_t op, expr_ptr e)
-        : op(op), rhs(LEXY_MOV(e)) {}
+    explicit Expr_unary(op_t op, expr_ptr rhs)
+        : op(op), rhs(LEXY_MOV(rhs)) {}
 
     virtual float evaluate(Environment& env) const {
         float rhs_v = rhs->evaluate(env);
@@ -150,6 +141,50 @@ struct Expr_binary : Expr {  // 双目运算
 };
 };  // namespace ast
 
+namespace config {
+
+struct Sym {  // 每一个带参符号，都由符号名、参数列表(参数指针，参数个数)构成
+    string sym_name;
+    optional<vector<string>> params;  // 形式参数的名字
+
+    Sym()
+        : sym_name(""), params({}) {}
+    Sym(string name, const optional<vector<string>> params)
+        : sym_name(LEXY_MOV(name)), params(LEXY_MOV(params)) {
+            // printf("在config::Sym中解析出 sym_name 为 %s\n", sym_name.c_str());
+        }
+};
+
+struct SymMap {
+    string name;                              // 右侧符号组的其中一个符号的名
+    optional<vector<ast::expr_ptr>> mappers;  // 一个符号包含若干个映射，vector长度为对应符号的参数数量
+    SymMap(string name, optional<vector<ast::expr_ptr>> mappers)
+        : name(LEXY_MOV(name)), mappers(LEXY_MOV(mappers)) {}
+    // 构建出该结构体，其实已经可以调用其各个ast的计算方法，但需要在传入Environment变量之前设置好相应的自变量的值，否则会因找不到变量而出错
+};
+
+struct LProduction {
+    string name;
+    Sym sym;
+    vector<SymMap> smaps;
+    LProduction(Sym sym, vector<SymMap> smaps)
+        : sym(LEXY_MOV(sym)), smaps(LEXY_MOV(smaps)) {
+        this->name = this->sym.sym_name;
+    }
+};
+
+struct LSystem {
+    vector<config::LProduction> prods;
+
+    LSystem(vector<config::LProduction> prods)
+        : prods(LEXY_MOV(prods)) {}
+    LSystem(vector<string>& prods) {
+        // 分别进行解析，转换为LProduction然后构造prods
+        throw "对字符串的解析还没有实现";
+    }
+};
+}  // namespace config
+
 namespace grammar {
 namespace dsl = lexy::dsl;
 constexpr auto escaped_newline = dsl::backslash >> dsl::newline;
@@ -160,14 +195,14 @@ struct SymName {
     static constexpr auto value = lexy::as_string<string>;
 };
 
-struct ParamItemSrc {      // value产生string，用于左侧解析显示
+struct ParamItemSrc {  // value产生string，用于左侧解析显示
     static constexpr auto rule = dsl::identifier(
         dsl::ascii::alpha / dsl::lit_c<'_'>,
         dsl::ascii::alnum / dsl::lit_c<'_'>);
     static constexpr auto value = lexy::as_string<string>;
 };
 
-struct ParamItem {      // value产生ast::Expr_var，用于右侧生成ast
+struct ParamItem {  // value产生ast::Expr_var，用于右侧生成ast
     static constexpr auto rule = dsl::identifier(
         dsl::ascii::alpha / dsl::lit_c<'_'>,
         dsl::ascii::alnum / dsl::lit_c<'_'>);
@@ -192,8 +227,7 @@ struct Sym {
     static constexpr auto value = lexy::construct<config::Sym>;
 };
 
-
-struct NumberD { // 用于解析显示
+struct NumberD {  // 用于解析显示
     static constexpr auto rule = dsl::integer<int> + dsl::opt(dsl::lit_c<'.'> >> dsl::integer<int>);
     // static constexpr auto value = lexy::construct<ast::Expr_literal>;
     static constexpr auto value = lexy::construct<config::Number>;
@@ -204,7 +238,6 @@ struct Number {
     static constexpr auto value = lexy::construct<ast::Expr_literal>;
     // static constexpr auto value = lexy::construct<config::Number>;
 };
-
 
 struct NestedExpr : lexy::transparent_production {
     static constexpr auto whitespace = dsl::ascii::space | escaped_newline;
@@ -222,11 +255,13 @@ struct MathExpr : lexy::expression_production {
         auto param_name_prefix = dsl::peek(dsl::ascii::alpha / dsl::lit_c<'_'>);
         auto number_prefix = dsl::peek(dsl::ascii::digit);
 
-        auto literal_number = number_prefix >> dsl::p<grammar::Number>; 
+        auto literal_number = number_prefix >> dsl::p<grammar::Number>;
         auto defined_param_name = param_name_prefix >> dsl::p<grammar::ParamItem>;
 
         auto paren_expr = dsl::parenthesized(dsl::p<NestedExpr>);
         return paren_expr | literal_number | defined_param_name | dsl::error<expected_operand>;
+
+        // 这个方案似乎不太可行，本质上只是建立了每个SymMap中各参数到Sym的参数组的映射
     }();
 
     struct ExprItem : dsl::infix_op_left {  // 乘除运算
@@ -245,11 +280,11 @@ struct MathExpr : lexy::expression_production {
         using operand = ExprNeg;
     };
 
-    struct ExprAssign : dsl::infix_op_single{
-        // 实现对LProduction的定义，将其合并入ast
-        static constexpr auto op = dsl::op<void>(LEXY_LIT("->"));
-        using operand = ExprRow;
-    };
+    // struct ExprAssign : dsl::infix_op_single {
+    //     // 实现对LProduction的定义，将其合并入ast
+    //     static constexpr auto op = dsl::op<void>(LEXY_LIT("->"));
+    //     using operand = ExprRow;
+    // };
 
     using operation = ExprRow;
 
@@ -259,6 +294,7 @@ struct MathExpr : lexy::expression_production {
         lexy::new_<ast::Expr_binary, ast::expr_ptr>,
         lexy::new_<ast::Expr_literal, ast::expr_ptr>,
         lexy::new_<ast::Expr_var, ast::expr_ptr>
+        // ,lexy::new_<ast::Expr_define, ast::expr_ptr>
     );
 };
 
@@ -278,18 +314,32 @@ struct SymMap {
 
 struct SymMapList {
     static constexpr auto rule = [] {
-        auto symmap_prefix = dsl::peek(dsl::ascii::alpha_underscore);
-        return dsl::list(symmap_prefix >> dsl::p<SymMap>);
+        auto prefix = dsl::peek(dsl::p<grammar::SymName>);
+        return dsl::list(prefix >> dsl::p<grammar::SymMap>);
+        // return dsl::list(dsl::p<grammar::SymMap>, dsl::sep(dsl::comma));
     }();
+    static constexpr auto value = lexy::as_list<vector<config::SymMap>>;
 };
 
 struct LProduction {
     static constexpr auto whitespace = dsl::ascii::space;
     static constexpr auto rule = [] {
-        auto lhs = dsl::p<Sym>;
-        auto rhs = dsl::p<SymMapList>;
+        auto lhs = dsl::p<grammar::Sym>;
+        auto rhs = dsl::p<grammar::SymMapList>;
         return lhs + LEXY_LIT("->") + rhs;
     }();
+    static constexpr auto value = lexy::construct<config::LProduction>;
+};
+
+struct LProductionList {
+    // static constexpr auto whitespace = dsl::ascii::space | dsl::ascii::newline;  // 忽略换行
+    static constexpr auto rule = dsl::list(dsl::p<LProduction>, dsl::sep(dsl::semicolon));
+    static constexpr auto value = lexy::as_list<vector<config::LProduction>>;
+};
+
+struct LSystem {
+    static constexpr auto rule = dsl::p<grammar::LProductionList>;
+    static constexpr auto value = lexy::construct<config::LSystem>;
 };
 
 }  // namespace grammar

@@ -134,3 +134,81 @@ struct SymMap {
   SymMap(string &name, optional<vector<ast::expr_ptr>> &mappers):name(name),mappers(mappers){}
 };
 ```
+
+### 开发记录
+
+需要将对LProduction的定义也加入到表达式解析中
+
+将 `config::Sym` 和 `config::SymMap` 继承 `ast::Expr` 来实现
+
+但是继承的结构会带来不可预测的后续维护成本，所以这里考虑在ast命名空间中重新实现一个对应的类
+
+这个方案似乎和原先的构思由出入，原来的设想只是建立了每个SymMap中各参数到Sym的参数组的映射
+
+
+重新梳理一下方案
+
+首先，要对一个LProduction列表进行解析，这个列表可以表示为 `vector<string>` ，每个元素是一条LSystem产生式
+
+解析的结果是生成一个类，它可以对输入字符串进行解析，对输入字符串应用 `SymCall` 产生式，输出值为应用对应规则的结果，`SymCall` 需要解析所有调用方的 `SymCallBody` ，和L产生式定义时定义的 `Sym` 不一样，这里的 `SymCallBody` 中的是实际参数而非形式参数，可以将其用lexy的语法构造为
+
+
+```c++
+namespace grammar{
+    struct SymCallBody{
+        static constexpr auto rule = dsl::parenthesized.list(dsl::p<grammar::MathExpr>);
+        static constexpr auto value = lexy::as_list(vector<ast::expr_ptr>);
+    };
+    struct SymCall{
+        static constexpr auto rule = dsl::p<SymName> + dsl::peek(dsl::lic_c<'()'>) >> dsl::p<SymCallBody>;
+        static constexpr auto value = lexy::construct<config::SymCall>;
+    };
+}
+```
+
+然后，`SymCall` 产生式对应的生成类定义为
+
+```c++
+namespace config{
+    struct SymCall{
+        string name;
+        vector<ast::expr_ptr> params;
+        SymCall(string name, vector<ast::expr_ptr> params):name(LEXY_MOV(name)),params(LEXY_MOV(params)){}  // 虽然还是没明白这里的移动语义的具体细节是怎么动作的，可能存在一定的优化空间
+    };
+};
+```
+
+这个包装类需不需要继承 `ast::expr_ptr` 接口？
+思考：继承它意味着这个类可以成为表达式的一部分，但是原本的 `evaluate()` 方法返回值是 `float` ，而不是这里应该返回的调用结果 `SymResult` ，从这个角度判断，它不应该继承 `ast::expr_ptr`，它不是表达式，而应该是放在 `Environment` 中，和 `calculator.cpp` 的 `funciton` 类似的存在
+
+但它需要执行一个动作，就是根据输入的 `name` 调用对应的L系统产生式，计算每个 `params` 的值，然后返回一段新的字符串，考虑将这个动作设计为一个方法，对 `SymCall` 定义进行补充
+
+
+```c++
+namespace config{
+    struct SymCall{
+        string name;
+        vector<ast::expr_ptr> params;
+        SymCall(string name, vector<ast::expr_ptr> params):name(LEXY_MOV(name)),params(LEXY_MOV(params)){}
+        string apply(config::LSystem &lsys) const {}
+    };
+};
+```
+
+虽然它不再是一个表达式，但仍然需要一个上下文，在这里，将这个上下文定义为 `config::LSystem` ，如下
+
+```c++
+    struct LSystem{
+        vector<config::LProduction> prods;
+        public:
+            LSystem(vector<config::LProduction> &prods):prods(prods){}
+            LSystem(vector<string> &prods){
+                // 分别进行解析，转换为LProduction然后构造prods
+            }
+    };
+```
+
+当然，这和最开始的定义不冲突
+
+
+
