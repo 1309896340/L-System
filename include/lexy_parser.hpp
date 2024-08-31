@@ -248,14 +248,6 @@ struct MathExpr : lexy::expression_production {
         lexy::new_<ast::Expr_binary, ast::expr_ptr>,
         lexy::new_<ast::Expr_literal, ast::expr_ptr>,  // 字面量
         lexy::new_<ast::Expr_var, ast::expr_ptr>
-        // [](string &varname){        // 将ParamItem产生的string转换成Expr_var
-        //     return make_shared<ast::Expr *>(new ast::Expr_var(varname));
-        // }
-        // lexy::new_<config::Number, ast::expr_ptr>,
-        // [](config::Number &number){ // 将grammar::Number产生的config::Number转换成Expr_literal
-        //     return dynamic_cast<ast::Expr *>(&number);
-        //     // return new ast::Expr_literal(number.value());
-        // }
     );
 };
 
