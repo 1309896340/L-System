@@ -55,7 +55,10 @@ void test_for_value() {
 }
 
 void test_for_LProduction() {
-    auto sinput = lexy::zstring_input("F(x,y,z) -> A(x+1,-y*0.3,(x+y)/2-z)F(0.8*x,0.6*y,0.9*z)C((x+y+z)/2)");
+    auto sinput = lexy::zstring_input("\
+    F(x,y,z) -> A(x+1,-y*0.3,(x+y)/2-z)F(0.8*x,0.6*y,0.9*z)C((x+y+z)/2);\
+    C(x) -> A(1,2*x,x-1)C(0.5*x)\
+    ");
 
     // 可视化解析树
     // lexy::parse_tree_for<decltype(sinput)> tree;
@@ -83,32 +86,26 @@ void test_for_LProduction() {
     printf("\n");
 }
 
-// void test_for_expr(){
+void test_for_expr(){
+    auto sinput = lexy::zstring_input("(x+y)/2-z+3*x*y");
+    
+    // lexy::parse_tree_for<decltype(sinput)> tree;
+    // auto res = lexy::parse_as_tree<grammar::LProduction>(tree, sinput, lexy_ext::report_error);
+    // bool success = res.is_success();
+    // if(!success){
+    //     printf("匹配失败\n");
+    //     return;
+    // }
+    // lexy::visualize(stdout, tree,{lexy::visualize_fancy});
 
-//     auto sinput = lexy::zstring_input("(x+y)/2-z+3*x*y");
+    auto res = lexy::parse<grammar::MathExpr>(sinput, lexy_ext::report_error);
 
-//     // lexy::parse_tree_for<decltype(sinput)> tree;
-//     // auto res = lexy::parse_as_tree<grammar::LProduction>(tree, sinput, lexy_ext::report_error);
-//     // bool success = res.is_success();
-//     // if(!success){
-//     //     printf("匹配失败\n");
-//     //     return;
-//     // }
-//     // lexy::visualize(stdout, tree,{lexy::visualize_fancy});
+    auto val = res.value();
+    ast::Environment env;
 
-//     auto res = lexy::parse<grammar::MathExpr>(sinput, lexy_ext::report_error);
+    printf("res = %.4f\n",val->evaluate(env));
+}
 
-//     auto val = res.value();
-//     ast::Environment env;
-
-//     printf("res = %.4f\n",val->evaluate(env));
-// }
-
-// void test_for_parse_LProduction(){
-//     auto sinput = lexy::zstring_input("Func(-a+1, 0.3 *b , ( a+ b)/ 3.2- c)F2(1.4*a, -3/d, c*(- 3+ 4))");
-//     auto result = lexy::parse<config::LSystem>(sinput, lexy_ext::report_error);
-//     // if(result.is)
-// }
 
 int main(void) {
     // test_for_key();
@@ -116,7 +113,6 @@ int main(void) {
     // test_for_value();
     // test_for_expr();
     test_for_LProduction();
-    // test_for_parse_LProduction();
 
     return 0;
 }

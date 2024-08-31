@@ -55,28 +55,6 @@ struct Expr_literal : Expr {
     }
 };
 
-// struct Expr_sym : Expr {
-//     config::Sym sym;
-//     Expr_sym(config::Sym sym)
-//         : sym(LEXY_MOV(sym)) {}
-
-//     virtual float evaluate(Environment& env) const {
-//         return 0;  // 定义L系统生成式没有返回值
-//     };
-// };
-
-// struct Expr_define: Expr{
-//     // 未完成的逻辑
-
-//     Expr_define(expr_ptr lhs, expr_ptr rhs){
-//         // lhs必须是Sym可以解析的对象，rhs必须是SymMap可以解析的对象
-
-//     }
-
-//     virtual float evaluate(Environment &env)const{
-
-//     }
-// };
 
 struct Expr_var : Expr {
     string varname;
@@ -280,12 +258,6 @@ struct MathExpr : lexy::expression_production {
         using operand = ExprNeg;
     };
 
-    // struct ExprAssign : dsl::infix_op_single {
-    //     // 实现对LProduction的定义，将其合并入ast
-    //     static constexpr auto op = dsl::op<void>(LEXY_LIT("->"));
-    //     using operand = ExprRow;
-    // };
-
     using operation = ExprRow;
 
     static constexpr auto value = lexy::callback<ast::expr_ptr>(
@@ -332,7 +304,7 @@ struct LProduction {
 };
 
 struct LProductionList {
-    // static constexpr auto whitespace = dsl::ascii::space | dsl::ascii::newline;  // 忽略换行
+    static constexpr auto whitespace = dsl::ascii::space | dsl::ascii::newline;  // 忽略换行
     static constexpr auto rule = dsl::list(dsl::p<LProduction>, dsl::sep(dsl::semicolon));
     static constexpr auto value = lexy::as_list<vector<config::LProduction>>;
 };
