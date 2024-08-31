@@ -37,7 +37,8 @@ struct LProduction {
     string name;  // 例如上述的"F"
     Sym sym;
     SymMap smap;
-    // map<string, ast::Expr> sym;      // 例如上述的{{"x",ast{x+y}},{"y",ast{}}}
+    LProduction(string &name, Sym &sym, SymMap &smap):name(name),sym(sym),smap(smap){}
+    
 };
 
 struct Number {

@@ -91,22 +91,6 @@ D0LSystem的 `iterate()` 实现
 
 ## 构建语法树
 
-表达式的作用域
-```cpp
-    struct environment{
-        // 一个LProduction中，每个Sym的每个ParamItem都对应一个SymMap
-        // 待构建 LProduction 对应的执行类
-    };
-```
-
-数学表达式语法树的基类
-
-```cpp
-    struct expr{
-        virtual ~expr()=default;
-        virtual float evaluate() const = 0;
-    };
-```
 
 在lexy中，表达式产生式继承自 `lexy::expression_production` ，在这个结构下，将各类运算分别用以下基类派生
 1. `dsl::infit_op_left` : 从左向右结合的运算，例如 (a ? b) ? c
@@ -118,5 +102,35 @@ D0LSystem的 `iterate()` 实现
 
 表达式产生式需要通过 `operation` 成员来指定最低优先级运算，并和其他自定义产生式一样有 `value` 成员来构造解析结果
 
+---
 
+目前，`LProduction` 为L-System生成式解析得到的封装类，但尚未实现其调用逻辑
+```cpp
+struct LProduction {
+    string name;
+    Sym sym;
+    SymMap smap;
+    LProduction(string &name, Sym &sym, SymMap &smap):name(name),sym(sym),smap(smap){}
+};
+```
+其由产生式名称 `name` ，产生式左部签名 `sym` 和右部映射目标 `smap` 构成
 
+```cpp
+struct Sym {
+    string sym_name;
+    optional<vector<string>> params;
+
+    Sym()
+        : sym_name(""), params({}) {}
+    Sym(const string& name, const optional<vector<string>>& params)
+        : sym_name(name), params(params) {}
+};
+```
+
+```cpp
+struct SymMap {
+  string name;
+  optional<vector<ast::expr_ptr>> mappers;
+  SymMap(string &name, optional<vector<ast::expr_ptr>> &mappers):name(name),mappers(mappers){}
+};
+```
