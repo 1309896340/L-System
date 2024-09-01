@@ -210,5 +210,7 @@ namespace config{
 
 当然，这和最开始的定义不冲突
 
+---
 
+问题：在 `config::LSysCall` 中使用 `ast::Environment` 来将一次LCall的实参传递给形参，但这种做法是不合适的，包括 `config::Environment` 中的 `map<string, int> params` 的设计也不合适，包括 `config::LSystem` 的设计也不合适，应当让 `vector<config::LProduction>` 直接成为 `config::Environment` 的成员，因为L产生式就相当于一个函数调用，它们地位应当是相同的
 
