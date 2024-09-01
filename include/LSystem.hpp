@@ -19,7 +19,7 @@ class LSystem {
   string axiom;
   LProduction prod;
 
-  map<string, Psym> sym_mapper;
+  map<string, config::Sym> sym_mapper;
 
   string current_state; // 迭代的当前状态
 

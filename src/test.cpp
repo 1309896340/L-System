@@ -10,7 +10,7 @@ void test_for_key() {
         "F_212(  alpha123, w_312 , 123abc)"};
 
     for (string& s : test_key) {
-        printf("è°ƒè¯•å­—ç¬¦ä¸²ï¼š %s\n", s.c_str());
+        printf("µ÷ÊÔ×Ö·û´®£º %s\n", s.c_str());
         auto s_input = lexy::zstring_input(s.c_str());
         // lexy::validate<SymDefineExpr>(s_input, lexy_ext::report_error);
         auto result = lexy::parse<grammar::Sym>(s_input, lexy_ext::report_error);
@@ -22,8 +22,8 @@ void test_for_key() {
         config::Sym p = result.value();
         bool hasParam = p.params.has_value();
 
-        printf("ç¬¦å·åï¼š%s\n", p.name.c_str());
-        printf("å‚æ•°åˆ—è¡¨ï¼š%s\n", hasParam ? "" : "ç©º");
+        printf("·ûºÅÃû£º%s\n", p.name.c_str());
+        printf("²ÎÊıÁĞ±í£º%s\n", hasParam ? "" : "¿Õ");
         if (hasParam) {
             for (string& pv : p.params.value())
                 printf("\"%s\"  ", pv.c_str());
@@ -36,18 +36,18 @@ void test_for_key() {
 void test_for_Number() {
     auto sinput = lexy::zstring_input("12");
     auto res = lexy::parse<grammar::NumberD>(sinput, lexy_ext::report_error);
-    printf("æ˜¯å¦æˆåŠŸï¼š%d\n", res.is_success());
+    printf("ÊÇ·ñ³É¹¦£º%d\n", res.is_success());
     config::Number val = res.value();
-    printf("è§£æç»“æœä¸º  %.6f\n", val.value());
+    printf("½âÎö½á¹ûÎª  %.6f\n", val.value());
 }
 
 void test_for_value() {
     auto sinput = lexy::zstring_input("Func(-a+1, 0.3 *b , ( a+ b)/ 3.2- c)F2(1.4*a, -3/d, c*(- 3+ 4))");
 
     auto res = lexy::validate<grammar::SymName>(sinput, lexy_ext::report_error);
-    printf("æ˜¯å¦æˆåŠŸï¼š%d\n", res.is_success());
+    printf("ÊÇ·ñ³É¹¦£º%d\n", res.is_success());
 
-    // å¯è§†åŒ–è§£æç»“æœ
+    // ¿ÉÊÓ»¯½âÎö½á¹û
     lexy::parse_tree_for<decltype(sinput)> tree;
     auto result = lexy::parse_as_tree<grammar::SymMapList>(tree, sinput, lexy_ext::report_error);
 
@@ -60,12 +60,12 @@ void test_for_LProduction() {
     C(x) -> A(1,2*x,x-1)C(0.5*x)\
     ");
 
-    // å¯è§†åŒ–è§£ææ ‘
+    // ¿ÉÊÓ»¯½âÎöÊ÷
     // lexy::parse_tree_for<decltype(sinput)> tree;
     // auto res = lexy::parse_as_tree<grammar::LProduction>(tree, sinput, lexy_ext::report_error);
     // bool success = res.is_success();
     // if(!success){
-    //     printf("åŒ¹é…å¤±è´¥\n");
+    //     printf("Æ¥ÅäÊ§°Ü\n");
     //     return;
     // }
     // lexy::visualize(stdout, tree,{lexy::visualize_fancy});
@@ -73,7 +73,7 @@ void test_for_LProduction() {
 
     auto res = lexy::parse<grammar::LSystem>(sinput, lexy_ext::report_error);
     if (!res.is_success()) {
-        printf("è§£æå¤±è´¥\n");
+        printf("½âÎöÊ§°Ü\n");
         return;
     }
 
@@ -93,7 +93,7 @@ void test_for_expr(){
     // auto res = lexy::parse_as_tree<grammar::LProduction>(tree, sinput, lexy_ext::report_error);
     // bool success = res.is_success();
     // if(!success){
-    //     printf("åŒ¹é…å¤±è´¥\n");
+    //     printf("Æ¥ÅäÊ§°Ü\n");
     //     return;
     // }
     // lexy::visualize(stdout, tree,{lexy::visualize_fancy});
@@ -121,7 +121,7 @@ void test_for_LSysCall(){
     config::LSysCall lsysc = rr.value();
 
     string output = lsysc.apply(lsys);
-    printf("ç”Ÿæˆæ–°å­—ç¬¦ä¸²ä¸º: %s\n", output.c_str());
+    printf("Éú³ÉĞÂ×Ö·û´®Îª: %s\n", output.c_str());
 }
 
 int main(void) {
