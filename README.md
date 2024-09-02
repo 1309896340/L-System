@@ -214,3 +214,23 @@ namespace config{
 
 问题：在 `config::LSysCall` 中使用 `ast::Environment` 来将一次LCall的实参传递给形参，但这种做法是不合适的，包括 `config::Environment` 中的 `map<string, int> params` 的设计也不合适，包括 `config::LSystem` 的设计也不合适，应当让 `vector<config::LProduction>` 直接成为 `config::Environment` 的成员，因为L产生式就相当于一个函数调用，它们地位应当是相同的
 
+
+修改方案：
+1. 在 `ast::Environment` 中加入一个新成员 `map<string, config::LProduction> prods;` 
+2. 为 `ast::Environment` 增加一个成员初始化构造函数 `Environment(const map<stirng, float> &vars, const map<string, config::LProduction> prods){}`，这样就可以允许从外部直接导入一些变量和L系统替换规则
+3. 重载构造函数，使其可以直接解析字符串构造 `config::LProduction` 
+4. 删除 `config::LSystem` 和 `grammar::LSystem`
+5. 修改 `config::LSysCall`，将其重构为ast的节点
+
+再次思考：这么做式不合适的，因为先前已经强调过LSystem不应该成为数学表达式的一部分，数学表达式解析仅负责前后参数之间的数值映射，而不负责字符串间的映射。因为 `ast::Expr` 的接口定义已经注定其 `evaluate()` 的结果只能是 `float`，而调用LSystem产生式进行计算结果应当是 `string`，两者发生了冲突
+
+解决方案：引入一个封装作为 `evaluate()` 的返回值，它可以是 `数值类型` 也可以是 `字符串类型`
+
+修改方案：
+1. 在 `ast` 命名空间声明一个表达式计算结果的封装类 `struct EvalResult{};`，具体定义如下
+2. 修改 `ast::Expr` 中接口 `virtual float evaluate(ast::Environment &env)=0;` 的定义，改为返回 `EvalResult`
+
+问题：这么做会导致我需要去更改ast下所有的 `evaluate` 实现，并判别所有返回结果的类型，但原本数学运算就不会与LSystem符号处在相同的运算层级，比如不存在一个数值和LSystem符号的运算，所以以上两套修改方案并不合适。
+
+
+小节：数学表达式中的 `Environment` 是一次LSysCall过程中的局部环境，与调用LProduction完全不是同一个层级，这里或许存在两套ast，数学表达式为内嵌ast，而LSystem则是外层ast，它们应当分开考虑，分割成两套不同的语法树和相应的解析器
