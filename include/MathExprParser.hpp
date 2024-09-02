@@ -98,6 +98,22 @@ struct Expr_binary : Expr {  // 双目运算
 namespace grammar {         // 语法解析=============================================================================================
 namespace dsl = lexy::dsl;
 constexpr auto escaped_newline = dsl::backslash >> dsl::newline;
+
+
+struct Number{
+    static constexpr auto rule = []{
+        auto prefix = dsl::peek(dsl::ascii::digit);
+        auto number = dsl::integer<int>;
+        auto fraction = dsl::opt(dsl::lit_c<'.'> >> dsl::integer<int>);
+        return prefix >> number + fraction;
+    }();
+    static constexpr auto value = lexy::construct<ast::Expr_literal>;
+};
+struct Variable{
+    static constexpr auto rule = dsl::identifier(dsl::ascii::alpha_underscore, dsl::ascii::alpha_digit_underscore);
+    static constexpr auto value = lexy::construct<ast::Expr_var>;
+};
+
 struct NestedExpr : lexy::transparent_production {
     static constexpr auto whitespace = dsl::ascii::space | escaped_newline;
     static constexpr auto rule = dsl::recurse<struct MathExpr>;
@@ -154,19 +170,6 @@ struct MathExpr : lexy::expression_production {
         lexy::new_<ast::Expr_var, ast::expr_ptr>
         // ,lexy::new_<ast::Expr_define, ast::expr_ptr>
     );
-};
-struct Number{
-    static constexpr auto rule = []{
-        auto prefix = dsl::peek(dsl::ascii::digit);
-        auto number = dsl::integer<int>;
-        auto fraction = dsl::opt(dsl::lit_c<'.'> >> dsl::integer<int>);
-        return prefix >> number + fraction;
-    }();
-    static constexpr auto value = lexy::construct<ast::Expr_literal>;
-};
-struct Variable{
-    static constexpr auto rule = dsl::identifier(dsl::ascii::alpha_underscore, dsl::ascii::alpha_digit_underscore);
-    static constexpr auto value = lexy::construct<ast::Expr_var>;
 };
 };  // namespace grammar
 };  // namespace math_parser

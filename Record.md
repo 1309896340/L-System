@@ -220,23 +220,42 @@ namespace config{
 
 ```mermaid
 graph TB
-T1([root]) --> B2[LSysCall] --> D3[SymName]
+T1([root]) --> B2[LProdCall] --> D3[SymName]
 B2 --> BB[ArgList] --> BB1[ArgExpr1]
 BB --> BB2[ArgExpr2]
 BB --> BB3[...]
-T1 --> A[ExprDefine] --> B[ExprMapSrc] --> D[SymName]
-B --> E[ParamList] --> F1[Var1]
-E --> F2[Var2]
+T1 --> A[LProduction] --> B[SymSrc] --> D[SymName]
+B --> E[ParamList] --> F1[Param1]
+E --> F2[Param2]
 E --> F3[...]
-A --> C[ExprMapDst] --> D2[SymName]
-C --> G[ParamMappedList] --> H1[MathExpr1]
-G --> H2[MathExpr2]
+A --> C[SymDstList] --> DD1[SymDst1] --> D2[SymName]
+C --> DD2[SymDst2]
+C --> DD3[...]
+DD1 --> G[ParamMapList] --> H1[ParamMap1]
+G --> H2[ParamMap2]
 G --> H3[...]
 ```
 
-这样就做到了在LSystem表达式中嵌入数学表达式的映射，在一个 `Expr_define` 中进行
-其中 `Expr_call` 和 `Expr_define` 为 `LSysExpr` 的atom
 
-其中的三个参数列表含义各有不同，`ParamList` 是定义处的形参列表，每个元素都是 identifier，`ParamMappedList` 是形参的数学映射，是多个数学表达式ast列表。而 `ArgList` 是调用时传入的实参列表，允许在其中进行一些简单的数学计算（通常用不着）
+其中的三个参数列表含义各有不同，`ParamList` 是定义处的形参列表，每个元素都是 identifier，`ParamMapList` 是所有形参的映射，是多个数学表达式ast列表。而 `ArgList` 是调用时传入的实参列表，允许在其中进行一些简单的数学计算（通常用不着）
 
-LSystem层似乎根本不需要构建表达式，因为它构不成复杂运算，只有定义和调用，返回值是字符串
+例如`LProduction` 的示例 `F(x,y) -> A(x+y,x-y,x*y)F(x/y,x+1)B((x+y+z)/3)` 
+
+
+```mermaid
+graph TB
+    T([LProduction]) --> A
+    T --> B_dst_list
+
+    A["F(x,y)"] --> A_symname[F]
+    A --> A_p_list["(x,y)"] --> A_p1[x]
+    A_p_list --> A_p2[y]
+
+    B_dst_list["A(x+y,x-y,x*y)F(x/y,x+1)B((x+y+z)/3)"] --> B_dst1["A(x+y,x-y,x*y)"] --> S_name[A]
+    B_dst_list --> B_dst2["F(x/y,x+1)"]
+    B_dst_list --> B_dst3["B((x+y+z)/3)"]
+
+    B_dst1 --> param_map_list["(x+y,x-y,x*y)"] --> param_map1["x+y"]
+    param_map_list --> param_map2["x-y"]
+    param_map_list --> param_map3["x*y"]
+```
