@@ -234,3 +234,33 @@ namespace config{
 
 
 小节：数学表达式中的 `Environment` 是一次LSysCall过程中的局部环境，与调用LProduction完全不是同一个层级，这里或许存在两套ast，数学表达式为内嵌ast，而LSystem则是外层ast，它们应当分开考虑，分割成两套不同的语法树和相应的解析器
+
+---
+
+修改日志：
+1. 创建 `MathExpr.hpp` 并将原本的数学表达式部分 `MathExpr` `NestedExpr` 转移到 `namespace math_parser` 的 `namespace grammar` 下，将原本ast下的定义也全转移到 `math_parser` 的ast下
+2. 原本的 `config::Number` 和 `config::ParamItem` 也搬过来，但是要将其修改到ast下，因为它们应当是与数学表达式直接耦合，而不是LSystem表达式的直接元素，在数学表达式下原本就可以定义变量和函数，但是它们的环境应当是独立、互不影响的，即便在解析过程中可能会存在歧义，这个后续遇到再考虑
+3. 创建 `LSysExpr.hpp`，将语法定义为如下结构
+
+```mermaid
+graph TB
+T1([LSysExpr]) --> B2(ExprCall) --> D3[SymName]
+B2 --> BB[ArgList] --> BB1[ArgExpr1]
+BB --> BB2[ArgExpr2]
+BB --> BB3[...]
+T1 --> A(ExprDefine) --> B[ExprMapSrc] --> D[SymName]
+B --> E[ParamList] --> F1[Var1]
+E --> F2[Var2]
+E --> F3[...]
+A --> C[ExprMapDst] --> D2[SymName]
+C --> G[ParamMappedList] --> H1[MathExpr1]
+G --> H2[MathExpr2]
+G --> H3[...]
+```
+
+这样就做到了在LSystem表达式中嵌入数学表达式的映射，在一个 `Expr_define` 中进行
+其中 `Expr_call` 和 `Expr_define` 为 `LSysExpr` 的atom
+
+其中的三个参数列表含义各有不同，`ParamList` 是定义处的形参列表，每个元素都是 identifier，`ParamMappedList` 是形参的数学映射，是多个数学表达式ast列表。而 `ArgList` 是调用时传入的实参列表，允许在其中进行一些简单的数学计算（通常用不着）
+
+LSystem层似乎根本不需要构建表达式，因为它构不成复杂运算，只有定义和调用，返回值是字符串
