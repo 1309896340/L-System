@@ -259,3 +259,7 @@ graph TB
     param_map_list --> param_map2["x-y"]
     param_map_list --> param_map3["x*y"]
 ```
+
+`LProdCall` 类需要通过应用产生式来进行迭代生成，而D0L-System严格保证无上下文关联的推导，只需要 `SymName` 相同即可应用，因此考虑将 `LProduction` 打包为 `map<string, LProduction>` 的形式封装为 `struct LSystem` 类，这和之前的做法是一样的
+
+

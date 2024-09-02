@@ -6,6 +6,7 @@
 #include <cstdint>
 #include <optional>
 #include <memory>
+#include <sstream>
 
 
 #include "lexy/callback.hpp"
