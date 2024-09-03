@@ -3,38 +3,40 @@
 #ifndef __WIND_D0LSYSTEM
 #define __WIND_LSYSTEM
 
-#include "lexy_parser.hpp"
+#define NDEBUG
 
-namespace {
+#include "LSysParser.hpp"
+
+namespace LSystem{
 
 using namespace std;
-// using LRule = map<string, string>;
 using LProduction = unordered_set<string>;
 
 void test_for_using() { cout << "ok" << endl; }
 
 
-class LSystem {
-  unordered_set<string> sym_nonparam; // 不带参数的符号
+class D0L_System {
+  LSysParser::config::LSystem lsystem;
   string axiom;
-  LProduction prod;
-
-  map<string, config::Sym> sym_mapper;
-
   string current_state; // 迭代的当前状态
 
 public:
-  LSystem(const string &axiom, const LProduction &prod) {
-    this->axiom = axiom;
-    this->prod = prod;
+  D0L_System(const string &axiom, const string &productions):axiom(axiom),current_state(axiom),lsystem() {
+    auto lsys_prods_string = lexy::string_input(productions);
+    auto lsys_res = lexy::parse<LSysParser::grammar::LSystem>(lsys_prods_string, lexy_ext::report_error);
+    assert(lsys_res.is_success());
+    this->lsystem = lsys_res.value();
+  }
 
-    printf("进入构造函数\n");
-    // 遍历prod，从中提取key的符号名、实参数量、所有实参值，生成Psym对象
-    for (auto &p : prod) {
-      printf("调试，待解析式：%s\n", p.c_str());
-      auto lexy_string = lexy::zstring_input(p.c_str());
-      // 继续编写
+  D0L_System(const string &axiom, const vector<string> &productions):axiom(axiom),current_state(axiom),lsystem() {
+    vector<LSysParser::config::LProduction> prods;
+    for(const string &production : productions){
+      auto lsys_prod_string = lexy::string_input(production);
+      auto lsys_prod_res = lexy::parse<LSysParser::grammar::LProduction>(lsys_prod_string, lexy_ext::report_error);
+      assert(lsys_prod_res.is_success());
+      prods.push_back(lsys_prod_res.value());
     }
+    this->lsystem = LSysParser::config::LSystem(prods);
   }
 
   string next() {
@@ -45,9 +47,11 @@ public:
   void reset() { this->current_state = this->axiom; }
 
   virtual string iterate(const string &p) {
-    auto input = lexy::string_input(p.c_str(), p.length());
-
-    return "";
+    auto input_string = lexy::string_input(p);
+    auto input_res = lexy::parse<LSysParser::grammar::LSysCall>(input_string, lexy_ext::report_error);
+    assert(input_res.is_success());
+    const LSysParser::config::LSysCall & syscall = input_res.value();
+    return syscall.apply(this->lsystem);
   };
 };
 
