@@ -69,7 +69,7 @@ struct Expr_unary : Expr { // 单目运算
 };
 
 struct Expr_binary : Expr { // 双目运算
-  enum op_t { plus, minus, multiply, divide } op;
+  enum op_t { plus, minus, mul, div } op;
   expr_ptr lhs, rhs;
 
   explicit Expr_binary(expr_ptr lhs, op_t op, expr_ptr rhs)
@@ -83,9 +83,9 @@ struct Expr_binary : Expr { // 双目运算
       return lhs_v + rhs_v;
     case minus:
       return lhs_v - rhs_v;
-    case multiply:
+    case mul:
       return lhs_v * rhs_v;
-    case divide:
+    case div:
       return lhs_v / rhs_v;
     }
     return 0;
@@ -285,8 +285,8 @@ struct MathExpr : lexy::expression_production {
 
   struct ExprItem : dsl::infix_op_left { // 乘除运算
     static constexpr auto op =
-        dsl::op<ast::Expr_binary::multiply>(dsl::lit_c<'*'>) /
-        dsl::op<ast::Expr_binary::divide>(dsl::lit_c<'/'>);
+        dsl::op<ast::Expr_binary::mul>(dsl::lit_c<'*'>) /
+        dsl::op<ast::Expr_binary::div>(dsl::lit_c<'/'>);
     using operand = dsl::atom;
   };
 

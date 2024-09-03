@@ -263,3 +263,68 @@ graph TB
 `LProdCall` 类需要通过应用产生式来进行迭代生成，而D0L-System严格保证无上下文关联的推导，只需要 `SymName` 相同即可应用，因此考虑将 `LProduction` 打包为 `map<string, LProduction>` 的形式封装为 `struct LSystem` 类，这和之前的做法是一样的
 
 
+---
+
+关于对L-System解析器执行文本替换的功能封装
+
+```c++
+struct LSysCall{
+    vector<LProdCall> calls;
+    LSysCall(vector<LProdCall> calls): calls(LEXY_MOV(calls)) {}
+    string apply(const LSystem& lsys) const {
+        stringstream ss;
+        for (auto& call : calls)
+            ss << call.apply(lsys);
+        return ss.str();
+    }
+};
+```
+
+`LSysCall` 是多个 `LProdCall` 构成的列表，因此它的 `apply()` 只需要遍历所有 `LProdCall` 实例并将结果进行拼接返回即可，将具体动作封装在相同方法签名的 `LProdCall::apply()` 中
+
+```c++
+struct LProdCall{
+    string name;
+    vector<float> args;
+    LProdCall(...){...};    // 这里省略了对args初始化的构造细节
+    string apply(const config::LSystem& lsys) const {
+        stringstream ss;
+        // 调用的具体细节
+        return ss.str();
+    }
+};
+```
+
+实现方案：
+1. 从 `lsys.prods` 中找到对应的替换规则，对找不到规则的call保留原始字串输出
+2. 将 `this->args` 中的值按顺序绑定给 `lsys` 下每个 `SymSrc` 的 `ParamList` 中的每个string元素，绑定的具体做法为：
+   
+   1. 创建一个 `MathParser::ast::Environment` 作为所有 `ParamMap` 的局部作用域
+   2. 以 `lsys.prods["xxx"].sSrc.params` 作为键，以 `this->args` 作为值，初始化 `Environment` 中的 `vars`
+   3. 在遍历每个 `ParamMap` 调用其 `evaluate(Environment &)` 时传入这个环境上下文
+   
+   <br/>
+   param和arg应当是一一对应的，但是需要做一些检查和处理以应对数量不相等的两种特殊情况。
+   
+   1. arg和param数量相等时正常传递
+   2. arg数量大于param时，超出的部分不传递
+   3. arg数量小于param时，不足的部分补0.0f
+   
+3. 
+
+
+
+问题：在调试时发现在定义LProduction时如果右侧出现左侧没有出现的参数名会出现异常，是个漏洞，需要在解析L-System产生式时检查并报错。
+
+解决方案：在 `LSysParser::config::LProduciton` 中的构造函数内实现检查
+
+问题：仍然需要在 `MathParser::ast::expr_ptr` 的表达式树下获得所有变量名，需要该对象提供这项功能，会产生不必要的计算开支
+
+解决方案：直接在 `MathParser::ast::Expr_var` 中修改，其原本的 `evaluate(Environment &env)` 实现是
+```c++
+virtual float evaluate(Environment& env) const {
+    auto iter = env.vars.find(varname);
+    return (iter == env.vars.end()) ? 0 : iter->second;
+}
+```
+改成不返回默认0，找不到变量就直接报异常，以防止产生运行时的不确定行为。同时，在 `LSysParser::config::LProduction::apply()` 中捕获这个异常，并提供更人性化的报错提示

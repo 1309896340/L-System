@@ -1,6 +1,6 @@
 #include "proj.h"
 
-// #define DEBUG
+#define DEBUG
 
 #ifndef __WIND_LSYSEXPR
 #define __WIND_LSYSEXPR
@@ -15,8 +15,8 @@ struct SymSrc {
     string name;
     vector<string> params;
     SymSrc() = default;
-    SymSrc(string name, vector<string> paramName)
-        : name(LEXY_MOV(name)), params(LEXY_MOV(params)) {}
+    SymSrc(string name, vector<string> paramNames)
+        : name(LEXY_MOV(name)), params(LEXY_MOV(paramNames)) {}
 };
 
 struct SymDst {
@@ -30,7 +30,15 @@ struct LProduction {
     vector<SymDst> sDsts;
     LProduction() = default;
     LProduction(SymSrc sSrc, vector<SymDst> sDsts)
-        : sSrc(LEXY_MOV(sSrc)), sDsts(LEXY_MOV(sDsts)) {}
+        : sSrc(LEXY_MOV(sSrc)), sDsts(LEXY_MOV(sDsts)) {
+            // 需要检查sSrc与sDsts中参数名是否一致，提供语法检查
+            for(auto &sDst : sDsts){
+                for(auto &param : sDst.paramMaps){
+                    // 如何检查MathParser::ast::expr_ptr下的Expr_var.name ?
+                    // 可能需要MathParser::ast提供一个遍历查找语法，或者直接在Expr_var中报错
+                }
+            }
+        }
 };
 
 struct LSystem {
@@ -45,7 +53,6 @@ struct LSystem {
     }
 };
 
-
 struct LProdCall {
     string name;
     vector<float> args;  // 在构造时进行计算
@@ -57,25 +64,60 @@ struct LProdCall {
         MathParser::ast::Environment env;
         for (auto& expr : args_expr)
             args.push_back(expr->evaluate(env));  // 计算出实参并入栈
-
-#ifdef DEBUG
-        // 对计算后的结果进行输出调试
-        printf("==========调试输出==============\n");
-        printf("%s(", this->name.c_str());
-        for (auto& elem : this->args) {
-            printf("%f,", elem);
-        }
-        printf("\b)\n");
-        printf("==========调试结束==============\n");
-#endif
     }
 
     string apply(const config::LSystem& lsys) const {
-        // 未完成
-        return "";
+        stringstream ss;
+
+        auto iter = lsys.prods.find(this->name);
+        if (iter == lsys.prods.end()) {
+            ss << this->name << '(';
+            for (float arg : this->args)
+                ss << arg << ',';
+            ss.seekp(-1, ss.cur);
+            ss << ')';
+
+            // printf("未知的产生式: \"%s\"，保留原始格式输出 \"%s\"\n", this->name.c_str(), ss.str().c_str());
+            return ss.str();
+        }
+        // 找到对应的LProduction
+        const config::LProduction &lprod = iter->second;
+        // 找到形参名列表
+        const vector<string> &paramNames = lprod.sSrc.params;
+        // 检查形参与实参的数量
+        const int &argNum = this->args.size(), &paramNum = paramNames.size();
+        // 创建ParamMap的局部作用域MathParser::ast::Environment，并初始化传入参数。这里只考虑值传递，不实现引用传递
+        MathParser::ast::Environment env;
+        auto p_iter = paramNames.begin(), p_end = paramNames.end();
+        auto a_iter = this->args.begin(), a_end = this->args.end();
+        while(p_iter!=p_end){
+            if(a_iter==a_end){ 
+                // 填充arg不足param的部分
+                env.vars[*p_iter] = 0.0f;
+            }else{  
+                // 相同数量按顺序传递
+                env.vars[*p_iter] = *a_iter;
+                a_iter++;
+            }
+            p_iter++;
+            // 忽略arg超出param的部分
+        }  
+
+        for(const config::SymDst &sDst: lprod.sDsts){
+            if(sDst.name=="B"){
+                // 调试断点
+                printf("");
+            }
+            ss << sDst.name << '(';
+            for(const MathParser::ast::expr_ptr &paramExpr : sDst.paramMaps)
+                ss << paramExpr->evaluate(env) << ',';
+            ss.seekp(-1, ss.cur);
+            ss << ')';
+        }
+
+        return ss.str();
     }
 };
-
 
 struct LSysCall {
     vector<LProdCall> calls;
@@ -102,9 +144,11 @@ struct SymName {
 struct ArgExpr {
     static constexpr auto rule = dsl::p<MathParser::grammar::MathExpr>;
     static constexpr auto value = lexy::construct<MathParser::ast::expr_ptr>;
+    // static constexpr auto value = lexy::forward<MathParser::ast::expr_ptr>;
 };
 
 struct ArgList {
+    static constexpr auto whitespace = dsl::ascii::space;
     static constexpr auto rule = dsl::parenthesized.list(dsl::p<ArgExpr>, dsl::sep(dsl::comma));
     static constexpr auto value = lexy::as_list<vector<MathParser::ast::expr_ptr>>;  // 在构造的过程中被计算
 };
@@ -119,12 +163,13 @@ struct LProdCall {
 };
 
 struct LProdCallList {
+    static constexpr auto whitespace = dsl::ascii::space;
     static constexpr auto rule = dsl::list(dsl::peek(dsl::p<SymName>) >> dsl::p<LProdCall>);
     static constexpr auto value = lexy::as_list<vector<config::LProdCall>>;
 };
 
 struct Param {
-    static constexpr auto rule = dsl::identifier(dsl::ascii::alpha_underscore, dsl::ascii::alpha_digit_underscore);
+    static constexpr auto rule = dsl::identifier(dsl::ascii::alpha, dsl::ascii::alpha_digit_underscore);
     static constexpr auto value = lexy::as_string<string>;
 };
 
@@ -140,7 +185,8 @@ struct SymSrc {
 
 struct ParamMap {
     static constexpr auto rule = dsl::p<MathParser::grammar::MathExpr>;
-    static constexpr auto value = lexy::construct<MathParser::ast::expr_ptr>;
+    // static constexpr auto value = lexy::construct<MathParser::ast::expr_ptr>;
+    static constexpr auto value = lexy::forward<MathParser::ast::expr_ptr>;
 };
 
 struct ParamMapList {

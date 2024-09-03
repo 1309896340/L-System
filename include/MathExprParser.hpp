@@ -5,7 +5,26 @@
 namespace MathParser {
 using namespace std;
 
-namespace ast {         // 抽象语法树构建===============================================================================================
+namespace exception {
+class Unknown_Variable : public std::exception {
+    string message;
+
+   public:
+    string varname;
+    string where;
+
+    Unknown_Variable(string varname, string where):varname(varname),where(where) {
+        this->message = "unknown variable name \"" + varname + "\" from \"" + where + "\"\n";
+    }
+
+    virtual const char* what() const noexcept override {
+        return this->message.c_str();
+    }
+};
+
+};  // namespace exception
+
+namespace ast {  // 抽象语法树构建===============================================================================================
 using expr_ptr = shared_ptr<struct Expr>;
 
 // struct function{
@@ -28,10 +47,10 @@ struct Expr_literal : Expr {
     Expr_literal(float val)
         : val(val) {}
     Expr_literal(const int a, const optional<int>& b)
-        : val(static_cast<float>(a)) {      // 初始化的时候就计算
+        : val(static_cast<float>(a)) {  // 初始化的时候就计算
         if (b.has_value()) {
             float tmp = static_cast<float>(b.value());
-            while (tmp > 1.0f)
+            while (tmp >= 1.0f)
                 tmp /= 10.0f;
             val += tmp;
         }
@@ -47,7 +66,11 @@ struct Expr_var : Expr {
         : varname(lexy::as_string<string>(lexeme)) {}
     virtual float evaluate(Environment& env) const {
         auto iter = env.vars.find(varname);
-        return (iter == env.vars.end()) ? 0 : iter->second;
+        if (iter == env.vars.end()) {
+            // 找不到的变量直接报错，防止产生运行时不确定行为
+            throw exception::Unknown_Variable(varname, "Expr_var");
+        }
+        return iter->second;
     }
 };
 
@@ -59,7 +82,12 @@ struct Expr_unary : Expr {  // 单目运算
         : op(op), rhs(LEXY_MOV(rhs)) {}
 
     virtual float evaluate(Environment& env) const {
-        float rhs_v = rhs->evaluate(env);
+        float rhs_v = 0.0f;
+        try {
+            rhs_v = rhs->evaluate(env);
+        } catch (MathParser::exception::Unknown_Variable e) {
+            throw MathParser::exception::Unknown_Variable(e.varname, "Expr_unary");
+        }
         switch (op) {
             case negate:
                 return -rhs_v;
@@ -71,37 +99,42 @@ struct Expr_unary : Expr {  // 单目运算
 struct Expr_binary : Expr {  // 双目运算
     enum op_t { plus,
                 minus,
-                multiply,
-                divide } op;
+                mul,
+                div } op;
     expr_ptr lhs, rhs;
 
     explicit Expr_binary(expr_ptr lhs, op_t op, expr_ptr rhs)
         : lhs(LEXY_MOV(lhs)), op(op), rhs(LEXY_MOV(rhs)) {}
 
     virtual float evaluate(Environment& env) const {
-        float lhs_v = lhs->evaluate(env);
-        float rhs_v = rhs->evaluate(env);
+        float lhs_v = 0.0f, rhs_v = 0.0f;
+        try {
+            lhs_v = lhs->evaluate(env);
+            rhs_v = rhs->evaluate(env);
+        } catch (MathParser::exception::Unknown_Variable e) {
+            throw MathParser::exception::Unknown_Variable(e.varname, "Expr_binary");
+        }
+
         switch (op) {
             case plus:
                 return lhs_v + rhs_v;
             case minus:
                 return lhs_v - rhs_v;
-            case multiply:
+            case mul:
                 return lhs_v * rhs_v;
-            case divide:
+            case div:
                 return lhs_v / rhs_v;
         }
-        return 0;
+        return 0.0f;
     }
 };
 };  // namespace ast
-namespace grammar {         // 语法解析=============================================================================================
+namespace grammar {  // 语法解析=============================================================================================
 namespace dsl = lexy::dsl;
 constexpr auto escaped_newline = dsl::backslash >> dsl::newline;
 
-
-struct Number{
-    static constexpr auto rule = []{
+struct Number {
+    static constexpr auto rule = [] {
         auto prefix = dsl::peek(dsl::ascii::digit);
         auto number = dsl::integer<int>;
         auto fraction = dsl::opt(dsl::lit_c<'.'> >> dsl::integer<int>);
@@ -109,7 +142,7 @@ struct Number{
     }();
     static constexpr auto value = lexy::construct<ast::Expr_literal>;
 };
-struct Variable{
+struct Variable {
     static constexpr auto rule = dsl::identifier(dsl::ascii::alpha_underscore, dsl::ascii::alpha_digit_underscore);
     static constexpr auto value = lexy::construct<ast::Expr_var>;
 };
@@ -126,14 +159,14 @@ struct MathExpr : lexy::expression_production {
 
     static constexpr auto whitespace = dsl::ascii::space;
     static constexpr auto atom = [] {
-        auto param_name_prefix = dsl::peek(dsl::ascii::alpha / dsl::lit_c<'_'>);
+        auto var_name_prefix = dsl::peek(dsl::ascii::alpha / dsl::lit_c<'_'>);
         auto number_prefix = dsl::peek(dsl::ascii::digit);
 
         auto literal_number = number_prefix >> dsl::p<grammar::Number>;
-        auto defined_param_name = param_name_prefix >> dsl::p<grammar::Variable>;
+        auto var_name = var_name_prefix >> dsl::p<grammar::Variable>;
 
         auto paren_expr = dsl::parenthesized(dsl::p<NestedExpr>);
-        return paren_expr | literal_number | defined_param_name |
+        return paren_expr | literal_number | var_name |
                dsl::error<expected_operand>;
 
         // 这个方案似乎不太可行，本质上只是建立了每个SymMap中各参数到Sym的参数组的映射
@@ -141,8 +174,8 @@ struct MathExpr : lexy::expression_production {
 
     struct ExprItem : dsl::infix_op_left {  // 乘除运算
         static constexpr auto op =
-            dsl::op<ast::Expr_binary::multiply>(dsl::lit_c<'*'>) /
-            dsl::op<ast::Expr_binary::divide>(dsl::lit_c<'/'>);
+            dsl::op<ast::Expr_binary::mul>(dsl::lit_c<'*'>) /
+            dsl::op<ast::Expr_binary::div>(dsl::lit_c<'/'>);
         using operand = dsl::atom;
     };
 
@@ -172,6 +205,6 @@ struct MathExpr : lexy::expression_production {
     );
 };
 };  // namespace grammar
-};  // namespace math_parser
+};  // namespace MathParser
 
 #endif
