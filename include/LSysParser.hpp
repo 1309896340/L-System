@@ -33,32 +33,59 @@ struct SymSrc {
         : name(LEXY_MOV(name)), params(LEXY_MOV(paramNames)) {}
 };
 
+// struct SymDst {
+//     string name;
+//     vector<MathParser::ast::expr_ptr> paramMaps;
+//     SymDst() = default;
+// };
+
+// struct SymDstMiddle {
+//     // middle layer for distinguishing real SymDst and ControlSym
+//     enum {
+//         SYMDST,
+//         CONTROLSYM
+//     } stype;
+//     SymDst symdst;
+//     string ctrlsym;
+//     SymDstMiddle(SymDst sdst)
+//         : stype(SYMDST), symdst(sdst), ctrlsym() {}
+//     SymDstMiddle(string cs)
+//         : stype(CONTROLSYM), symdst(), ctrlsym(cs) {}
+// };
+
 struct SymDst {
-    string name;
-    SymDst() = default;
-    vector<MathParser::ast::expr_ptr> paramMaps;
+    enum SType {
+        MAP_SYM,
+        CONTROL_SYM
+    } stype;
+    SymDst(SType st)
+        : stype(st) {}
 };
 
-struct SymDstMiddle {
-    // middle layer for distinguishing real SymDst and ControlSym
-    enum {
-        SYMDST,
-        CONTROLSYM
-    } stype;
-    SymDst symdst;
-    string ctrlsym;
-    SymDstMiddle(SymDst sdst)
-        : stype(SYMDST), symdst(sdst), ctrlsym() {}
-    SymDstMiddle(string cs)
-        : stype(CONTROLSYM), symdst(), ctrlsym(cs) {}
+// MapSym和原本的SymDst结构保持一致
+struct MapSym : public SymDst {
+    string name;
+    vector<MathParser::ast::expr_ptr> paramMaps;
+    MapSym()
+        : SymDst(MAP_SYM) {}
+    MapSym(string name, vector<MathParser::ast::expr_ptr> paramMaps)
+        : name(LEXY_MOV(name)), paramMaps(LEXY_MOV(paramMaps)), SymDst(MAP_SYM) {}
+};
+
+// ControlSym则只保存一个控制字符
+struct ControlSym : public SymDst {
+    char ctrlChar;
+    ControlSym()
+        : SymDst(CONTROL_SYM) {}
+    ControlSym(string cc)
+        : SymDst(CONTROL_SYM), ctrlChar(cc[0]) {}
 };
 
 struct LProduction {
     SymSrc sSrc;
-    // vector<SymDst> sDsts;
-    vector<SymDstMiddle> sDsts;
+    vector<shared_ptr<SymDst>> sDsts;
     LProduction() = default;
-    LProduction(SymSrc sSrc, vector<SymDstMiddle> sDsts)
+    LProduction(SymSrc sSrc, vector<shared_ptr<SymDst>> sDsts)
         : sSrc(LEXY_MOV(sSrc)), sDsts(LEXY_MOV(sDsts)) {}
 };
 
@@ -98,7 +125,6 @@ struct LProdCall {
             ss.seekp(-1, ss.cur);
             ss << ')';
 
-            // printf("未知的产生式: \"%s\"，保留原始格式输出 \"%s\"\n", this->name.c_str(), ss.str().c_str());
             return ss.str();
         }
         // 找到对应的LProduction
@@ -124,19 +150,20 @@ struct LProdCall {
             // 忽略arg超出param的部分
         }
 
-        for (const config::SymDstMiddle& sDstMiddle : lprod.sDsts) {  // 从SymDst修改为SymDstMiddle以允许一些特殊控制符的介入
-            switch (sDstMiddle.stype) {
-                case config::SymDstMiddle::SYMDST: {
-                    const config::SymDst& sDst = sDstMiddle.symdst;
-                    ss << sDst.name << '(';
-                    for (const MathParser::ast::expr_ptr& paramExpr : sDst.paramMaps)
+        for (const shared_ptr<config::SymDst>& sDst : lprod.sDsts) {
+            switch (sDst->stype) {
+                case config::SymDst::MAP_SYM: {
+                    const config::MapSym* sd = static_cast<config::MapSym*>(sDst.get());
+                    ss << sd->name << '(';
+                    for (const MathParser::ast::expr_ptr& paramExpr : sd->paramMaps)
                         ss << paramExpr->evaluate(env) << ',';
                     ss.seekp(-1, ss.cur);
                     ss << ')';
                     break;
                 }
-                case config::SymDstMiddle::CONTROLSYM: {
-                    const string& ctrlSym = sDstMiddle.ctrlsym;
+                case config::SymDst::CONTROL_SYM: {
+                    const config::ControlSym* sd = static_cast<config::ControlSym*>(sDst.get());
+                    const char& ctrlSym = sd->ctrlChar;
                     ss << ctrlSym;
                     break;
                 }
@@ -174,7 +201,6 @@ struct SymName {
 struct ArgExpr {
     static constexpr auto rule = dsl::p<MathParser::grammar::MathExpr>;
     static constexpr auto value = lexy::construct<MathParser::ast::expr_ptr>;
-    // static constexpr auto value = lexy::forward<MathParser::ast::expr_ptr>;
 };
 
 struct ArgList {
@@ -225,9 +251,9 @@ struct ParamMapList {
     static constexpr auto value = lexy::as_list<vector<MathParser::ast::expr_ptr>>;
 };
 
-struct SymDst {
+struct MapSym {
     static constexpr auto rule = dsl::p<SymName> + dsl::p<ParamMapList>;
-    static constexpr auto value = lexy::construct<config::SymDst>;
+    static constexpr auto value = lexy::construct<config::MapSym>;
 };
 
 struct ControlSym {
@@ -235,21 +261,23 @@ struct ControlSym {
     static constexpr auto value = lexy::as_string<string>;
 };
 
-struct SymDstMiddle {
-    static constexpr auto whitespace = dsl::ascii::blank;
+struct SymDst {
     static constexpr auto rule = [] {
-        auto symDst = dsl::peek(dsl::p<SymName>) >> dsl::p<SymDst>;
-        auto ctrlSym = dsl::peek(dsl::p<ControlSym>) >> dsl::p<ControlSym>;
-        return symDst | ctrlSym;
+        auto mapSym = dsl::peek(dsl::p<SymName>) >> dsl::p<MapSym>;
+        auto ctrlSym = dsl::p<ControlSym>;
+        return mapSym | dsl::else_ >> ctrlSym;
     }();
-    // Mix SymDst and ConrtrolSym into one Class
-    static constexpr auto value = lexy::construct<config::SymDstMiddle>;
+    static constexpr auto value = lexy::callback<shared_ptr<config::SymDst>>(
+        lexy::new_<config::MapSym, shared_ptr<config::SymDst>>,
+        lexy::new_<config::ControlSym, shared_ptr<config::SymDst>>
+    );
 };
+
 
 struct SymDstList {
     static constexpr auto whitespace = dsl::ascii::blank;
-    static constexpr auto rule = dsl::list((dsl::peek(dsl::p<SymName>) | dsl::peek(dsl::p<ControlSym>)) >> dsl::p<SymDstMiddle>);
-    static constexpr auto value = lexy::as_list<vector<config::SymDstMiddle>>;  // 修改成了符合类
+    static constexpr auto rule = dsl::list((dsl::peek(dsl::p<SymName>) | dsl::peek(dsl::p<ControlSym>)) >> dsl::p<SymDst>);
+    static constexpr auto value = lexy::as_list<vector<shared_ptr<config::SymDst>>>;
 };
 
 struct LProduction {

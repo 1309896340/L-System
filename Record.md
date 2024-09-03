@@ -344,3 +344,34 @@ virtual float evaluate(Environment& env) const {
 问题：如果这么做得话，需要修改 `LSysParser::config::SymDst` 的定义，使其同时能够描述哪些特殊字符，并要有一个标志位让它和标准 `SymDst` 做区分，同时也要修改  `LParser::config::SymDstList` 中的 `value` 为 `lexy::callback<>()`，但这么做会变得很奇怪，`SymDst` 会变得太臃肿
 
 解决方案：为 `LParser::config::SymDstList` 的 `value` 加入一个中间层，来区分特殊字符 `ControlSym` 和 `SymDst`
+
+问题：这么做不太优雅，考虑采用继承和多态的方式实现，以 `SymDst` 作为基类，和前面类似的，其包含一个`stype`枚举成员用以区分实际子类，但是具体数据通过子类 `ControlSym` 和 `MapSym` 来维护
+
+```c++
+struct SymDst {
+    enum SType{
+        MAP_SYM,
+        CONTROL_SYM
+    } stype;
+    SymDst(SType st):stype(st){}
+};
+
+// MapSym和原本的SymDst结构保持一致
+struct MapSym : public SymDst {
+    string name;
+    vector<MathParser::ast::expr_ptr> paramMaps;
+    MapSym()
+        : SymDst(MAP_SYM) {}
+    MapSym(string name, vector<MathParser::ast::expr_ptr> paramMaps)
+        : name(LEXY_MOV(name)), paramMaps(LEXY_MOV(paramMaps)), SymDst(MAP_SYM) {}
+};
+
+// ControlSym则只保存一个控制字符
+struct ControlSym : public SymDst {
+    char ctrlChar;
+    ControlSym()
+        : SymDst(CONTROL_SYM) {}
+    ControlSym(char cc)
+        : SymDst(CONTROL_SYM), ctrlChar(cc) {}
+};
+```
