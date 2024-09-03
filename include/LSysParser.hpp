@@ -36,7 +36,7 @@ struct LProduction {
 struct LSystem {
     map<string, LProduction> prods;
     LSystem() = default;
-    LSystem(const map<string, LProduction>& prods)
+    LSystem(map<string, LProduction> prods)
         : prods(LEXY_MOV(prods)) {}
     LSystem(vector<LProduction> prods)
         : prods() {

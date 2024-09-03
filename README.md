@@ -25,9 +25,45 @@ Lindenmayer的继任者Prusinkiewicz在1992年著有 _The Algorithm Beauty of Pl
 
 # 文档
 
-## 调用
+## 使用示例
 
+### 方式1
 
+```c++
+#include "LSystem.hpp"
+using namespace std;
+int main(int argc, char** argv) {
+    LSystem::D0L_System lsys("A(4,5)F(1,2,3)B(4)", "F(x,y,z)->A(x+z,y-x)F(x-2,z-3,y-1)B(y/2)\\nA(x,y)->B(x/2)A(y/2,x/2)B(y+1)");
+    for (int i = 0; i < 3; i++)
+        cout << lsys.next() << endl;
+    return 0;
+}
+```
+
+### 方式2
+
+```c++
+#include "LSystem.hpp"
+using namespace std;
+int main(int argc, char** argv) {
+    vector<string> prods = {
+        "F(x,y,z)->A(x+z,y-x)F(x-2,z-3,y-1)B(y/2)",
+        "A(x,y)->B(x/2)A(y/2,x/2)B(y+1)"
+    };
+    LSystem::D0L_System lsys("A(4,5)F(1,2,3)B(4)", prods);
+    for (int i = 0; i < 3; i++)
+        cout << lsys.next() << endl;
+    return 0;
+}
+```
+
+### 输出结果
+
+```shell
+B(2)A(2.5,2)B(6)A(4,1)F(-1,0,1)B(1)B(4)
+B(2)B(1.25)A(1,1.25)B(3)B(6)B(2)A(0.5,2)B(2)A(0,1)F(-3,-2,-1)B(0)B(1)B(4)
+B(2)B(1.25)B(0.5)A(0.625,0.5)B(2.25)B(3)B(6)B(2)B(0.25)A(1,0.25)B(3)B(2)B(0)A(0.5,0)B(2)A(-4,1)F(-5,-4,-3)B(-1)B(0)B(1)B(4)
+```
 
 ## 语法结构
 
