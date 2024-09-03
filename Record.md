@@ -332,3 +332,15 @@ virtual float evaluate(Environment& env) const {
 }
 ```
 改成不返回默认0，找不到变量就直接报异常，以防止产生运行时的不确定行为。同时，在 `LSysParser::config::LProduction::apply()` 中捕获这个异常，并提供更人性化的报错提示
+
+代码重构完成
+
+---
+
+需求：目前实现的 `LSysParser::grammer::LProduction` 只支持右侧以 `LSysParser::grammer::SymDst` 连接构成，但是它们之间应当允许加入一些特殊字符，例如在后期可能需要实现的可视化环节，会使用`\` `/` `+` `-` `^` `$` 这些符号来描述三维空间上的姿态变换，以及使用 `[` 和 `]` 描述对当前状态的"入栈"和"出栈"操作，这些都需要补充实现
+
+实施方案：修改 `LSysParser::grammer::LProduction` 下 `SymDstList` 的 `rule`，为其加入分支结构，捕获上述特殊字符并不对其做特殊处理直接输出，可能会使用 `dsl::capture` 语法实现
+
+问题：如果这么做得话，需要修改 `LSysParser::config::SymDst` 的定义，使其同时能够描述哪些特殊字符，并要有一个标志位让它和标准 `SymDst` 做区分，同时也要修改  `LParser::config::SymDstList` 中的 `value` 为 `lexy::callback<>()`，但这么做会变得很奇怪，`SymDst` 会变得太臃肿
+
+解决方案：为 `LParser::config::SymDstList` 的 `value` 加入一个中间层，来区分特殊字符 `ControlSym` 和 `SymDst`

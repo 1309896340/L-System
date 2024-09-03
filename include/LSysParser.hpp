@@ -10,6 +10,20 @@
 namespace LSysParser {
 using namespace std;
 
+namespace exception {
+class Unknown_SymDstMiddleType : public std::exception {
+    string message;
+
+   public:
+    Unknown_SymDstMiddleType() {
+        this->message = "Unkown SymDstMiddleType";
+    }
+    virtual const char* what() const noexcept override {
+        return this->message.c_str();
+    }
+};
+};  // namespace exception
+
 namespace config {
 struct SymSrc {
     string name;
@@ -25,11 +39,26 @@ struct SymDst {
     vector<MathParser::ast::expr_ptr> paramMaps;
 };
 
+struct SymDstMiddle {
+    // middle layer for distinguishing real SymDst and ControlSym
+    enum {
+        SYMDST,
+        CONTROLSYM
+    } stype;
+    SymDst symdst;
+    string ctrlsym;
+    SymDstMiddle(SymDst sdst)
+        : stype(SYMDST), symdst(sdst), ctrlsym() {}
+    SymDstMiddle(string cs)
+        : stype(CONTROLSYM), symdst(), ctrlsym(cs) {}
+};
+
 struct LProduction {
     SymSrc sSrc;
-    vector<SymDst> sDsts;
+    // vector<SymDst> sDsts;
+    vector<SymDstMiddle> sDsts;
     LProduction() = default;
-    LProduction(SymSrc sSrc, vector<SymDst> sDsts)
+    LProduction(SymSrc sSrc, vector<SymDstMiddle> sDsts)
         : sSrc(LEXY_MOV(sSrc)), sDsts(LEXY_MOV(sDsts)) {}
 };
 
@@ -73,38 +102,47 @@ struct LProdCall {
             return ss.str();
         }
         // 找到对应的LProduction
-        const config::LProduction &lprod = iter->second;
+        const config::LProduction& lprod = iter->second;
         // 找到形参名列表
-        const vector<string> &paramNames = lprod.sSrc.params;
+        const vector<string>& paramNames = lprod.sSrc.params;
         // 检查形参与实参的数量
         const int &argNum = this->args.size(), &paramNum = paramNames.size();
         // 创建ParamMap的局部作用域MathParser::ast::Environment，并初始化传入参数。这里只考虑值传递，不实现引用传递
         MathParser::ast::Environment env;
         auto p_iter = paramNames.begin(), p_end = paramNames.end();
         auto a_iter = this->args.begin(), a_end = this->args.end();
-        while(p_iter!=p_end){
-            if(a_iter==a_end){ 
+        while (p_iter != p_end) {
+            if (a_iter == a_end) {
                 // 填充arg不足param的部分
                 env.vars[*p_iter] = 0.0f;
-            }else{  
+            } else {
                 // 相同数量按顺序传递
                 env.vars[*p_iter] = *a_iter;
                 a_iter++;
             }
             p_iter++;
             // 忽略arg超出param的部分
-        }  
+        }
 
-        for(const config::SymDst &sDst: lprod.sDsts){
-            if(sDst.name=="B"){
-                // 调试断点
-                printf("");
+        for (const config::SymDstMiddle& sDstMiddle : lprod.sDsts) {  // 从SymDst修改为SymDstMiddle以允许一些特殊控制符的介入
+            switch (sDstMiddle.stype) {
+                case config::SymDstMiddle::SYMDST: {
+                    const config::SymDst& sDst = sDstMiddle.symdst;
+                    ss << sDst.name << '(';
+                    for (const MathParser::ast::expr_ptr& paramExpr : sDst.paramMaps)
+                        ss << paramExpr->evaluate(env) << ',';
+                    ss.seekp(-1, ss.cur);
+                    ss << ')';
+                    break;
+                }
+                case config::SymDstMiddle::CONTROLSYM: {
+                    const string& ctrlSym = sDstMiddle.ctrlsym;
+                    ss << ctrlSym;
+                    break;
+                }
+                default:
+                    throw exception::Unknown_SymDstMiddleType();
             }
-            ss << sDst.name << '(';
-            for(const MathParser::ast::expr_ptr &paramExpr : sDst.paramMaps)
-                ss << paramExpr->evaluate(env) << ',';
-            ss.seekp(-1, ss.cur);
-            ss << ')';
         }
 
         return ss.str();
@@ -192,10 +230,26 @@ struct SymDst {
     static constexpr auto value = lexy::construct<config::SymDst>;
 };
 
+struct ControlSym {
+    static constexpr auto rule = dsl::capture(dsl::ascii::punct);
+    static constexpr auto value = lexy::as_string<string>;
+};
+
+struct SymDstMiddle {
+    static constexpr auto whitespace = dsl::ascii::blank;
+    static constexpr auto rule = [] {
+        auto symDst = dsl::peek(dsl::p<SymName>) >> dsl::p<SymDst>;
+        auto ctrlSym = dsl::peek(dsl::p<ControlSym>) >> dsl::p<ControlSym>;
+        return symDst | ctrlSym;
+    }();
+    // Mix SymDst and ConrtrolSym into one Class
+    static constexpr auto value = lexy::construct<config::SymDstMiddle>;
+};
+
 struct SymDstList {
     static constexpr auto whitespace = dsl::ascii::blank;
-    static constexpr auto rule = dsl::list(dsl::peek(dsl::p<SymName>) >> dsl::p<SymDst>);  // 考虑不做分隔符区分
-    static constexpr auto value = lexy::as_list<vector<config::SymDst>>;
+    static constexpr auto rule = dsl::list((dsl::peek(dsl::p<SymName>) | dsl::peek(dsl::p<ControlSym>)) >> dsl::p<SymDstMiddle>);
+    static constexpr auto value = lexy::as_list<vector<config::SymDstMiddle>>;  // 修改成了符合类
 };
 
 struct LProduction {
