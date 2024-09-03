@@ -3,9 +3,9 @@
 #ifndef __WIND_D0LSYSTEM
 #define __WIND_LSYSTEM
 
-#include "lexy_parser.hpp"
+#include "LSysParser.hpp"
 
-namespace {
+namespace LSystem{
 
 using namespace std;
 // using LRule = map<string, string>;
@@ -14,27 +14,20 @@ using LProduction = unordered_set<string>;
 void test_for_using() { cout << "ok" << endl; }
 
 
-class LSystem {
-  unordered_set<string> sym_nonparam; // 不带参数的符号
+class D0L_System {
+
   string axiom;
-  LProduction prod;
-
-  map<string, Psym> sym_mapper;
-
   string current_state; // 迭代的当前状态
 
 public:
-  LSystem(const string &axiom, const LProduction &prod) {
-    this->axiom = axiom;
-    this->prod = prod;
-
-    printf("进入构造函数\n");
-    // 遍历prod，从中提取key的符号名、实参数量、所有实参值，生成Psym对象
-    for (auto &p : prod) {
-      printf("调试，待解析式：%s\n", p.c_str());
-      auto lexy_string = lexy::zstring_input(p.c_str());
-      // 继续编写
-    }
+  LSysParser::config::LSystem lsystem;
+  
+  D0L_System(const string &axiom, const string &productions):axiom(axiom),current_state(axiom),lsystem() {
+    auto lsys_prods_string = lexy::string_input(productions);
+    auto lsys_res = lexy::parse<LSysParser::grammar::LSystem>(lsys_prods_string, lexy_ext::report_error);
+    assert(lsys_res.is_success());
+    // const LSysParser::config::LSystem &lsys = lsys_res.value();
+    this->lsystem = lsys_res.value();
   }
 
   string next() {
@@ -45,9 +38,11 @@ public:
   void reset() { this->current_state = this->axiom; }
 
   virtual string iterate(const string &p) {
-    auto input = lexy::string_input(p.c_str(), p.length());
-
-    return "";
+    auto input_string = lexy::string_input(p);
+    auto input_res = lexy::parse<LSysParser::grammar::LSysCall>(input_string, lexy_ext::report_error);
+    assert(input_res.is_success());
+    const LSysParser::config::LSysCall & syscall = input_res.value();
+    return syscall.apply(this->lsystem);
   };
 };
 

@@ -30,15 +30,7 @@ struct LProduction {
     vector<SymDst> sDsts;
     LProduction() = default;
     LProduction(SymSrc sSrc, vector<SymDst> sDsts)
-        : sSrc(LEXY_MOV(sSrc)), sDsts(LEXY_MOV(sDsts)) {
-            // 需要检查sSrc与sDsts中参数名是否一致，提供语法检查
-            for(auto &sDst : sDsts){
-                for(auto &param : sDst.paramMaps){
-                    // 如何检查MathParser::ast::expr_ptr下的Expr_var.name ?
-                    // 可能需要MathParser::ast提供一个遍历查找语法，或者直接在Expr_var中报错
-                }
-            }
-        }
+        : sSrc(LEXY_MOV(sSrc)), sDsts(LEXY_MOV(sDsts)) {}
 };
 
 struct LSystem {
@@ -46,7 +38,7 @@ struct LSystem {
     LSystem() = default;
     LSystem(const map<string, LProduction>& prods)
         : prods(LEXY_MOV(prods)) {}
-    LSystem(const vector<LProduction>& prods)
+    LSystem(vector<LProduction> prods)
         : prods() {
         for (const LProduction& prod : prods)
             this->prods[prod.sSrc.name] = prod;
@@ -163,7 +155,7 @@ struct LProdCall {
 };
 
 struct LProdCallList {
-    static constexpr auto whitespace = dsl::ascii::space;
+    static constexpr auto whitespace = dsl::ascii::blank;
     static constexpr auto rule = dsl::list(dsl::peek(dsl::p<SymName>) >> dsl::p<LProdCall>);
     static constexpr auto value = lexy::as_list<vector<config::LProdCall>>;
 };
@@ -174,6 +166,7 @@ struct Param {
 };
 
 struct ParamList {
+    static constexpr auto whitespace = dsl::ascii::space;
     static constexpr auto rule = dsl::parenthesized.list(dsl::p<Param>, dsl::sep(dsl::comma));
     static constexpr auto value = lexy::as_list<vector<string>>;
 };
@@ -185,11 +178,11 @@ struct SymSrc {
 
 struct ParamMap {
     static constexpr auto rule = dsl::p<MathParser::grammar::MathExpr>;
-    // static constexpr auto value = lexy::construct<MathParser::ast::expr_ptr>;
     static constexpr auto value = lexy::forward<MathParser::ast::expr_ptr>;
 };
 
 struct ParamMapList {
+    static constexpr auto whitespace = dsl::ascii::blank;
     static constexpr auto rule = dsl::parenthesized.list(dsl::p<ParamMap>, dsl::sep(dsl::comma));
     static constexpr auto value = lexy::as_list<vector<MathParser::ast::expr_ptr>>;
 };
@@ -200,24 +193,25 @@ struct SymDst {
 };
 
 struct SymDstList {
+    static constexpr auto whitespace = dsl::ascii::blank;
     static constexpr auto rule = dsl::list(dsl::peek(dsl::p<SymName>) >> dsl::p<SymDst>);  // 考虑不做分隔符区分
     static constexpr auto value = lexy::as_list<vector<config::SymDst>>;
 };
 
 struct LProduction {
-    static constexpr auto whitespace = dsl::ascii::space;
+    static constexpr auto whitespace = dsl::ascii::blank;
     static constexpr auto rule = dsl::p<SymSrc> + LEXY_LIT("->") + dsl::p<SymDstList>;
     static constexpr auto value = lexy::construct<config::LProduction>;
 };
 
 struct LSystem {
-    static constexpr auto whitespace = dsl::ascii::space;
-    static constexpr auto rule = dsl::list(dsl::p<LProduction>, dsl::sep(dsl::ascii::newline));  // 通过换行来分割LProduction字符串
+    static constexpr auto whitespace = dsl::ascii::blank;
+    static constexpr auto rule = dsl::list(dsl::p<LProduction>, dsl::sep(dsl::newline));  // 通过换行来分割LProduction字符串
     static constexpr auto value = lexy::as_list<vector<config::LProduction>>;
 };
 
 struct LSysCall {
-    static constexpr auto whitespace = dsl::ascii::space;
+    static constexpr auto whitespace = dsl::ascii::blank;
     static constexpr auto rule = dsl::p<LProdCallList>;
     static constexpr auto value = lexy::construct<config::LSysCall>;
 };
